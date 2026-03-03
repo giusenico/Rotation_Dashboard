@@ -1,0 +1,32 @@
+name: Daily Market Data Fetch
+
+on:
+  # Run every weekday at 21:30 UTC (22:30 CET / 23:30 CEST)
+  # US market closes at 16:00 ET = 21:00 UTC (winter) / 20:00 UTC (summer)
+  # 30-minute buffer after latest possible close
+  schedule:
+    - cron: '30 21 * * 1-5'
+
+  # Allow manual trigger from GitHub Actions UI
+  workflow_dispatch:
+
+jobs:
+  fetch-data:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Fetch daily market data
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: python scripts/fetch_data.py
