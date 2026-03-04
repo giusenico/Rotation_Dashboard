@@ -69,7 +69,13 @@ def fetch_and_store(conn, symbol: str, start: str, end: str) -> int:
                 """INSERT INTO daily_prices
                    (symbol, date, open, high, low, close, adj_close, volume)
                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-                   ON CONFLICT (symbol, date) DO NOTHING""",
+                   ON CONFLICT (symbol, date) DO UPDATE SET
+                     open = EXCLUDED.open,
+                     high = EXCLUDED.high,
+                     low = EXCLUDED.low,
+                     close = EXCLUDED.close,
+                     adj_close = EXCLUDED.adj_close,
+                     volume = EXCLUDED.volume""",
                 (
                     symbol,
                     date_str,
