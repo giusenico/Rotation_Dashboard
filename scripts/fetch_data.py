@@ -101,7 +101,8 @@ def main() -> None:
     print("Connecting to Supabase PostgreSQL ...")
     conn = psycopg2.connect(SUPABASE_DB_URL)
 
-    end_date = datetime.today().strftime("%Y-%m-%d")
+    # yfinance treats `end` as exclusive, so we use tomorrow to include today's data
+    end_date = (datetime.today() + timedelta(days=1)).strftime("%Y-%m-%d")
     full_start = (datetime.today() - timedelta(days=HISTORY_YEARS * 365)).strftime(
         "%Y-%m-%d"
     )
