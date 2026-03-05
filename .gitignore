@@ -11,6 +11,7 @@ frontend/.env
 
 # Data
 data/
+obv_backfill.csv
 
 # Frontend build artifacts
 frontend/node_modules/

@@ -5,6 +5,7 @@ import { SectorRRGPage } from "./pages/SectorRRGPage";
 import { CrossAssetRRGPage } from "./pages/CrossAssetRRGPage";
 import { PriceExplorerPage } from "./pages/PriceExplorerPage";
 import { RankingsPage } from "./pages/RankingsPage";
+import { OBVStructurePage } from "./pages/OBVStructurePage";
 
 const router = createBrowserRouter([
   {
@@ -16,6 +17,7 @@ const router = createBrowserRouter([
       { path: "rrg/cross-asset", element: <CrossAssetRRGPage /> },
       { path: "prices", element: <PriceExplorerPage /> },
       { path: "rankings", element: <RankingsPage /> },
+      { path: "obv", element: <OBVStructurePage /> },
     ],
   },
 ]);

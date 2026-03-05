@@ -9,11 +9,12 @@
 
 html, body, #root {
   height: 100%;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
     "Helvetica Neue", Arial, sans-serif;
   background: var(--bg-primary);
   color: var(--text-primary);
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 a {
@@ -22,6 +23,22 @@ a {
 }
 a:hover {
   color: var(--accent-hover);
+}
+
+/* ── Custom Scrollbar ────────────────────────────────────────── */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
 }
 
 /* ── App Layout ───────────────────────────────────────────────── */
@@ -41,7 +58,7 @@ a:hover {
 .app-content {
   flex: 1;
   overflow-y: auto;
-  padding: 24px;
+  padding: 28px 32px;
 }
 
 /* ── Sidebar ──────────────────────────────────────────────────── */
@@ -52,17 +69,23 @@ a:hover {
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
+  transition: width 0.2s ease;
 }
 
 .sidebar-brand {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 20px 16px;
+  padding: 24px 16px 20px;
   font-size: 15px;
   font-weight: 700;
   color: var(--text-primary);
   border-bottom: 1px solid var(--border);
+  letter-spacing: -0.3px;
+}
+
+.sidebar-brand svg {
+  color: var(--accent);
 }
 
 .sidebar-nav {
@@ -77,11 +100,12 @@ a:hover {
   align-items: center;
   gap: 10px;
   padding: 10px 12px;
-  border-radius: 6px;
-  font-size: 14px;
+  border-radius: 8px;
+  font-size: 13.5px;
   font-weight: 500;
   color: var(--text-secondary);
-  transition: background 0.15s, color 0.15s;
+  transition: all 0.15s ease;
+  position: relative;
 }
 .sidebar-link:hover {
   background: var(--sidebar-hover);
@@ -90,6 +114,33 @@ a:hover {
 .sidebar-link--active {
   background: var(--sidebar-active);
   color: var(--accent);
+  font-weight: 600;
+}
+.sidebar-link--active::before {
+  content: "";
+  position: absolute;
+  left: -8px;
+  top: 6px;
+  bottom: 6px;
+  width: 3px;
+  background: var(--accent);
+  border-radius: 0 3px 3px 0;
+}
+
+.sidebar-group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 4px;
+}
+
+.sidebar-section-label {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--text-muted);
+  padding: 12px 12px 4px;
 }
 
 /* ── Header ───────────────────────────────────────────────────── */
@@ -97,15 +148,16 @@ a:hover {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 16px 24px;
+  padding: 16px 32px;
   border-bottom: 1px solid var(--border);
   background: var(--bg-secondary);
 }
 
 .header-title {
   font-size: 18px;
-  font-weight: 600;
+  font-weight: 700;
   color: var(--text-primary);
+  letter-spacing: -0.3px;
 }
 
 /* ── Theme Toggle ─────────────────────────────────────────────── */
@@ -120,11 +172,12 @@ a:hover {
   background: var(--bg-tertiary);
   color: var(--text-secondary);
   cursor: pointer;
-  transition: background 0.15s, color 0.15s;
+  transition: all 0.15s ease;
 }
 .theme-toggle:hover {
   background: var(--border);
   color: var(--text-primary);
+  transform: scale(1.05);
 }
 
 /* ── Info Box ────────────────────────────────────────────────── */
@@ -136,7 +189,7 @@ a:hover {
   background: var(--bg-card);
   border: 1px solid var(--border);
   border-left: 3px solid var(--accent);
-  border-radius: 8px;
+  border-radius: 10px;
   margin-bottom: 20px;
   font-size: 13px;
   line-height: 1.6;
@@ -211,7 +264,7 @@ a:hover {
 
 .quadrant-item {
   padding: 8px 12px;
-  border-radius: 6px;
+  border-radius: 8px;
   font-size: 12px;
   line-height: 1.5;
 }
@@ -251,7 +304,7 @@ a:hover {
 /* ── Tab Description ─────────────────────────────────────────── */
 .tab-description {
   font-size: 13px;
-  line-height: 1.6;
+  line-height: 1.7;
   color: var(--text-secondary);
   margin-bottom: 16px;
   padding: 0 2px;
@@ -281,8 +334,14 @@ a:hover {
   padding: 16px;
   background: var(--bg-card);
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: 12px;
   box-shadow: var(--shadow);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-hover);
 }
 
 .card-icon {
@@ -291,7 +350,7 @@ a:hover {
   justify-content: center;
   width: 40px;
   height: 40px;
-  border-radius: 8px;
+  border-radius: 10px;
   background: var(--bg-tertiary);
   color: var(--accent);
   flex-shrink: 0;
@@ -304,35 +363,43 @@ a:hover {
 }
 
 .card-label {
-  font-size: 12px;
-  color: var(--text-secondary);
+  font-size: 11px;
+  color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0.5px;
+  font-weight: 600;
 }
 
 .card-value {
   font-size: 20px;
   font-weight: 700;
   color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.5px;
 }
 
 /* ── Charts ───────────────────────────────────────────────────── */
 .chart-container {
   background: var(--bg-card);
   border: 1px solid var(--border);
-  border-radius: 10px;
-  overflow: hidden;
+  border-radius: 12px;
   box-shadow: var(--shadow);
   min-height: 300px;
+  transition: box-shadow 0.2s ease;
+  /* Don't use overflow:hidden — it clips Plotly toolbars and axes */
 }
 
-.chart-container .js-plotly-plot {
-  border-radius: 10px;
+.chart-container:hover {
+  box-shadow: var(--shadow-hover);
 }
 
-/* Ensure Plotly charts fill their container properly */
 .chart-container .js-plotly-plot .plotly {
   width: 100% !important;
+}
+
+/* Plotly modebar should not be clipped */
+.chart-container .modebar-container {
+  z-index: 10;
 }
 
 /* ── Dashboard ────────────────────────────────────────────────── */
@@ -360,13 +427,18 @@ a:hover {
 
 .section-header h2 {
   font-size: 16px;
-  font-weight: 600;
+  font-weight: 700;
   color: var(--text-primary);
+  letter-spacing: -0.2px;
 }
 
 .view-full-link {
   font-size: 13px;
-  font-weight: 500;
+  font-weight: 600;
+  transition: opacity 0.15s;
+}
+.view-full-link:hover {
+  opacity: 0.8;
 }
 
 /* ── RRG Page ─────────────────────────────────────────────────── */
@@ -381,7 +453,7 @@ a:hover {
   padding: 16px;
   background: var(--bg-card);
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: 12px;
   margin-bottom: 16px;
   flex-wrap: wrap;
   box-shadow: var(--shadow);
@@ -404,6 +476,7 @@ a:hover {
   margin-left: auto;
   font-size: 13px;
   color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
 }
 
 /* ── Explorer Page ────────────────────────────────────────────── */
@@ -429,12 +502,12 @@ a:hover {
 .toggle-btn {
   padding: 8px 16px;
   font-size: 13px;
-  font-weight: 500;
+  font-weight: 600;
   border: none;
   background: var(--bg-card);
   color: var(--text-secondary);
   cursor: pointer;
-  transition: background 0.15s, color 0.15s;
+  transition: all 0.15s ease;
 }
 .toggle-btn:not(:last-child) {
   border-right: 1px solid var(--border);
@@ -475,7 +548,7 @@ a:hover {
 .tab-btn {
   padding: 10px 20px;
   font-size: 14px;
-  font-weight: 500;
+  font-weight: 600;
   border: none;
   background: transparent;
   color: var(--text-secondary);
@@ -498,17 +571,18 @@ a:hover {
   margin-top: 24px;
   background: var(--bg-card);
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: 12px;
   overflow: hidden;
   box-shadow: var(--shadow);
 }
 
 .table-title {
   font-size: 14px;
-  font-weight: 600;
+  font-weight: 700;
   color: var(--text-primary);
   padding: 14px 16px;
   border-bottom: 1px solid var(--border);
+  letter-spacing: -0.2px;
 }
 
 .rankings-table {
@@ -520,8 +594,11 @@ a:hover {
 .rankings-table th {
   text-align: left;
   padding: 10px 14px;
-  font-weight: 600;
-  color: var(--text-secondary);
+  font-weight: 700;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-muted);
   border-bottom: 1px solid var(--border);
   background: var(--bg-secondary);
   white-space: nowrap;
@@ -541,7 +618,19 @@ a:hover {
   color: var(--text-primary);
 }
 
+.rankings-table tbody tr {
+  transition: background 0.1s ease;
+}
+
 .rankings-table tbody tr:hover {
+  background: var(--sidebar-hover);
+}
+
+/* Alternating row striping */
+.rankings-table tbody tr:nth-child(even) {
+  background: var(--bg-row-alt);
+}
+.rankings-table tbody tr:nth-child(even):hover {
   background: var(--sidebar-hover);
 }
 
@@ -549,21 +638,37 @@ a:hover {
   font-weight: 700;
   color: var(--text-muted);
   width: 40px;
+  font-variant-numeric: tabular-nums;
 }
 
 .ticker-cell {
   font-weight: 700;
-  font-family: "SF Mono", "Fira Code", monospace;
+  font-family: "JetBrains Mono", "SF Mono", "Fira Code", monospace;
+  font-size: 12.5px;
 }
 
 .num-cell {
-  font-family: "SF Mono", "Fira Code", monospace;
+  font-family: "JetBrains Mono", "SF Mono", "Fira Code", monospace;
+  font-size: 12.5px;
   text-align: right;
+  font-variant-numeric: tabular-nums;
 }
 
 .quadrant-badge {
-  font-weight: 600;
-  font-size: 12px;
+  font-weight: 700;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  display: inline-block;
+}
+
+.quadrant-badge.positive {
+  background: rgba(63, 185, 80, 0.1);
+}
+.quadrant-badge.negative {
+  background: rgba(248, 81, 73, 0.1);
 }
 
 .positive { color: var(--success); }
@@ -604,9 +709,197 @@ a:hover {
   padding: 20px;
   background: var(--bg-card);
   border: 1px solid var(--danger);
-  border-radius: 10px;
+  border-radius: 12px;
   color: var(--danger);
   font-size: 14px;
+}
+
+/* ── OBV Preview (Dashboard) ──────────────────────────────────── */
+.obv-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.obv-preview-meta {
+  display: flex;
+  gap: 16px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.obv-regime-count {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.obv-preview-cols {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.obv-preview-col {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.obv-col-header {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border);
+}
+
+.obv-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  padding: 3px 0;
+}
+
+.obv-row-name {
+  flex: 1;
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.obv-score-bar-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.obv-score-track {
+  width: 48px;
+  height: 5px;
+  background: var(--border);
+  border-radius: 3px;
+  overflow: hidden;
+  position: relative;
+}
+
+.obv-score-fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 100%;
+  border-radius: 3px;
+}
+
+/* ── OBV Table Row (clickable) ────────────────────────────────── */
+.obv-table-row {
+  cursor: pointer;
+}
+.obv-table-row:hover {
+  background: var(--sidebar-hover) !important;
+}
+
+/* ── Modal ────────────────────────────────────────────────────── */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  animation: fadeIn 0.15s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.modal-panel {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.4);
+  width: 100%;
+  max-width: 860px;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: slideUp 0.2s ease;
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.modal-body {
+  overflow-y: auto;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.modal-close-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.modal-close-btn:hover {
+  background: var(--border);
+  color: var(--text-primary);
+  transform: scale(1.05);
+}
+
+.modal-metric-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 20px;
+  padding: 14px 16px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+
+.modal-metric {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 90px;
+}
+
+.modal-metric-val {
+  font-size: 16px;
+  font-weight: 700;
+  font-family: "JetBrains Mono", "SF Mono", "Fira Code", monospace;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
 }
 
 /* ── Responsive ───────────────────────────────────────────────── */
@@ -626,6 +919,9 @@ a:hover {
     justify-content: center;
     padding: 10px 8px;
   }
+  .sidebar-link--active::before {
+    display: none;
+  }
   .dashboard-charts {
     grid-template-columns: 1fr;
   }
@@ -643,5 +939,11 @@ a:hover {
   }
   .info-box {
     font-size: 12px;
+  }
+  .obv-preview-cols {
+    grid-template-columns: 1fr;
+  }
+  .sidebar-section-label {
+    display: none;
   }
 }

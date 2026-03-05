@@ -27,4 +27,6 @@ export const darkTheme: Record<string, string> = {
   "--sidebar-hover": "#161b22",
   "--sidebar-active": "#1f6feb22",
   "--shadow": "0 1px 3px rgba(0,0,0,0.4)",
+  "--shadow-hover": "0 4px 20px rgba(0,0,0,0.5)",
+  "--bg-row-alt": "rgba(255,255,255,0.02)",
 };

@@ -1,0 +1,30 @@
+import { useQuery } from "@tanstack/react-query";
+import { fetchOBVDetail, fetchOBVScoreHistory, fetchOBVStructure } from "../api/obv";
+
+export function useOBVStructure() {
+  return useQuery({
+    queryKey: ["obv", "structure"],
+    queryFn: fetchOBVStructure,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+  });
+}
+
+export function useOBVScoreHistory(symbols?: string[], lookback = 252) {
+  return useQuery({
+    queryKey: ["obv", "score-history", symbols ?? "all", lookback],
+    queryFn: () => fetchOBVScoreHistory(symbols, lookback),
+    staleTime: 5 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+  });
+}
+
+export function useOBVDetail(symbol: string | null, lookback = 252) {
+  return useQuery({
+    queryKey: ["obv", "detail", symbol, lookback],
+    queryFn: () => fetchOBVDetail(symbol!, lookback),
+    enabled: symbol !== null,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+  });
+}

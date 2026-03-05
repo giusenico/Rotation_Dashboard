@@ -44,7 +44,7 @@ export function PriceLineChart({ series, normalized = false, height = 500 }: Pri
           paper_bgcolor: bgColor,
           plot_bgcolor: bgColor,
           height,
-          margin: { l: 60, r: 20, t: 10, b: 40 },
+          margin: { l: 60, r: 20, t: 20, b: 50 },
           xaxis: {
             gridcolor: gridColor,
             color: textColor,

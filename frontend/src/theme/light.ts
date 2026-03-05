@@ -26,5 +26,7 @@ export const lightTheme: Record<string, string> = {
   "--sidebar-bg": "#f6f8fa",
   "--sidebar-hover": "#eaeef2",
   "--sidebar-active": "#0969da18",
-  "--shadow": "0 1px 3px rgba(0,0,0,0.1)",
+  "--shadow": "0 1px 3px rgba(0,0,0,0.08)",
+  "--shadow-hover": "0 4px 16px rgba(0,0,0,0.12)",
+  "--bg-row-alt": "rgba(0,0,0,0.015)",
 };

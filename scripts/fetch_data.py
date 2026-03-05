@@ -105,7 +105,11 @@ def main() -> None:
     args = parser.parse_args()
 
     print("Connecting to Supabase PostgreSQL ...")
-    conn = psycopg2.connect(SUPABASE_DB_URL)
+    try:
+        conn = psycopg2.connect(SUPABASE_DB_URL)
+    except Exception as exc:
+        print(f"[FATAL] Could not connect to database: {exc}")
+        sys.exit(1)
 
     # yfinance treats `end` as exclusive, so we use tomorrow to include today's data
     end_date = (datetime.today() + timedelta(days=1)).strftime("%Y-%m-%d")
@@ -114,6 +118,7 @@ def main() -> None:
     )
 
     total_inserted = 0
+    errors = 0
     symbols = list(ALL_TICKERS.keys())
 
     print(f"Fetching data for {len(symbols)} tickers ...")
@@ -121,27 +126,35 @@ def main() -> None:
     print(f"Date range: {full_start} -> {end_date}\n")
 
     for i, symbol in enumerate(symbols, 1):
-        if args.full:
-            start_date = full_start
-        else:
-            last = get_last_date(conn, symbol)
-            if last:
-                # Start from the day after the last stored date
-                start_date = (
-                    datetime.strptime(last, "%Y-%m-%d") + timedelta(days=1)
-                ).strftime("%Y-%m-%d")
-                if start_date >= end_date:
-                    print(f"  [{i}/{len(symbols)}] {symbol} — already up to date")
-                    continue
-            else:
+        try:
+            if args.full:
                 start_date = full_start
+            else:
+                last = get_last_date(conn, symbol)
+                if last:
+                    # Start from the day after the last stored date
+                    start_date = (
+                        datetime.strptime(last, "%Y-%m-%d") + timedelta(days=1)
+                    ).strftime("%Y-%m-%d")
+                    if start_date >= end_date:
+                        print(f"  [{i}/{len(symbols)}] {symbol} — already up to date")
+                        continue
+                else:
+                    start_date = full_start
 
-        inserted = fetch_and_store(conn, symbol, start_date, end_date)
-        total_inserted += inserted
-        print(f"  [{i}/{len(symbols)}] {symbol} — {inserted} rows inserted")
+            inserted = fetch_and_store(conn, symbol, start_date, end_date)
+            total_inserted += inserted
+            print(f"  [{i}/{len(symbols)}] {symbol} — {inserted} rows inserted")
+        except Exception as exc:
+            errors += 1
+            print(f"  [{i}/{len(symbols)}] {symbol} — [ERROR] {exc}")
+            # Rollback the failed transaction so the connection stays usable
+            conn.rollback()
 
     conn.close()
-    print(f"\nDone. {total_inserted} total rows inserted.")
+    print(f"\nDone. {total_inserted} total rows inserted, {errors} errors.")
+    if errors:
+        sys.exit(1)
 
 
 if __name__ == "__main__":

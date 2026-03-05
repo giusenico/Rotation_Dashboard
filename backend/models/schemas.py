@@ -94,6 +94,62 @@ class DrawdownResponse(BaseModel):
     data: list[DrawdownPoint]
 
 
+# ── OBV Structure ───────────────────────────────────────────────────
+
+class OBVSpreadPoint(BaseModel):
+    date: str
+    value: float
+
+
+class OBVStructureEntry(BaseModel):
+    asset: str
+    symbol: str
+    obv_regime: str
+    rotation_score: float | None = None
+    spread_percentile: float | None = None
+    spread_momentum_z: float | None = None
+    return_1m: float | None = None
+    return_3m: float | None = None
+    return_6m: float | None = None
+    return_ytd: float | None = None
+    spread_series: list[OBVSpreadPoint]
+
+
+class OBVScorePoint(BaseModel):
+    date: str
+    rotation_score: float | None = None
+    obv_regime: str
+
+
+class OBVScoreHistoryEntry(BaseModel):
+    symbol: str
+    asset: str
+    data: list[OBVScorePoint]
+
+
+class OBVDetailScorePoint(BaseModel):
+    date: str
+    rotation_score: float | None = None
+    obv_regime: str
+    spread_last: float | None = None
+
+
+class OBVDetailResponse(BaseModel):
+    symbol: str
+    asset: str
+    obv_regime: str
+    rotation_score: float | None = None
+    spread_percentile: float | None = None
+    spread_momentum_z: float | None = None
+    return_1m: float | None = None
+    return_3m: float | None = None
+    return_6m: float | None = None
+    return_ytd: float | None = None
+    obv_series: list[OBVSpreadPoint]
+    spread_series: list[OBVSpreadPoint]
+    score_history: list[OBVDetailScorePoint]
+
+
 # ── Dashboard ────────────────────────────────────────────────────────
 
 class DashboardSummary(BaseModel):

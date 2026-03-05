@@ -1,12 +1,79 @@
 import { useDashboardSummary } from "../hooks/usePriceData";
 import { useSectorRRG, useCrossAssetRRG } from "../hooks/useRRGData";
 import { usePerformance } from "../hooks/usePriceData";
+import { useOBVStructure } from "../hooks/useOBVData";
 import { RRGChart } from "../components/charts/RRGChart";
 import { PerformanceBarChart } from "../components/charts/PerformanceBarChart";
 import { LoadingSpinner } from "../components/common/LoadingSpinner";
 import { formatPct, formatDate } from "../utils/formatters";
 import { Link } from "react-router-dom";
-import { Radar, Globe, TrendingUp, Calendar, BarChart3, Info } from "lucide-react";
+import { Radar, Globe, TrendingUp, Calendar, BarChart3, Info, TrendingDown, Activity } from "lucide-react";
+
+function OBVPreview() {
+  const { data, isLoading } = useOBVStructure();
+
+  if (isLoading) return <LoadingSpinner />;
+  if (!data || data.length === 0) return null;
+
+  const sorted = [...data].sort((a, b) => (b.rotation_score ?? -1) - (a.rotation_score ?? -1));
+  const topBuy = sorted.filter((e) => e.obv_regime === "buy").slice(0, 4);
+  const topSell = sorted.filter((e) => e.obv_regime === "sell").reverse().slice(0, 4);
+
+  const buyCount = data.filter((e) => e.obv_regime === "buy").length;
+  const sellCount = data.filter((e) => e.obv_regime === "sell").length;
+
+  return (
+    <div className="obv-preview">
+      <div className="obv-preview-meta">
+        <span className="obv-regime-count positive">
+          <TrendingUp size={13} /> {buyCount} Accumulation
+        </span>
+        <span className="obv-regime-count negative">
+          <TrendingDown size={13} /> {sellCount} Distribution
+        </span>
+      </div>
+
+      <div className="obv-preview-cols">
+        <div className="obv-preview-col">
+          <div className="obv-col-header positive">Top Accumulation (BUY)</div>
+          {topBuy.map((entry) => (
+            <div key={entry.symbol} className="obv-row">
+              <span className="obv-row-name">{entry.asset}</span>
+              <span className="ticker-cell">{entry.symbol}</span>
+              <OBVScoreBar value={entry.rotation_score} />
+            </div>
+          ))}
+        </div>
+        <div className="obv-preview-col">
+          <div className="obv-col-header negative">Top Distribution (SELL)</div>
+          {topSell.map((entry) => (
+            <div key={entry.symbol} className="obv-row">
+              <span className="obv-row-name">{entry.asset}</span>
+              <span className="ticker-cell">{entry.symbol}</span>
+              <OBVScoreBar value={entry.rotation_score} />
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function OBVScoreBar({ value }: { value: number | null }) {
+  if (value == null) return <span>—</span>;
+  const pct = ((value + 1) / 2) * 100;
+  const color = value >= 0 ? "var(--success)" : "var(--danger)";
+  return (
+    <div className="obv-score-bar-wrapper">
+      <div className="obv-score-track">
+        <div className="obv-score-fill" style={{ width: `${pct}%`, background: color }} />
+      </div>
+      <span style={{ color, fontSize: 11, fontFamily: "monospace", minWidth: 44, textAlign: "right" }}>
+        {value.toFixed(2)}
+      </span>
+    </div>
+  );
+}
 
 export function DashboardPage() {
   const { data: summary, isLoading } = useDashboardSummary();
@@ -100,6 +167,20 @@ export function DashboardPage() {
           ) : (
             <LoadingSpinner />
           )}
+        </div>
+      </div>
+
+      {/* OBV Structure snapshot */}
+      <div className="dashboard-chart-section">
+        <div className="section-header">
+          <h2><Activity size={16} style={{ display: "inline", marginRight: 6, verticalAlign: "middle" }} />OBV Structure Snapshot</h2>
+          <Link to="/obv" className="view-full-link">View Full &rarr;</Link>
+        </div>
+        <p className="section-subtitle">
+          On-Balance Volume regime signals ranked by composite rotation score. BUY = accumulation, SELL = distribution.
+        </p>
+        <div className="chart-container" style={{ padding: "16px 20px" }}>
+          <OBVPreview />
         </div>
       </div>
 

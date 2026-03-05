@@ -7,6 +7,7 @@ const pageTitles: Record<string, string> = {
   "/rrg/cross-asset": "Cross-Asset Rotation (RRG)",
   "/prices": "Price Explorer",
   "/rankings": "Rankings",
+  "/obv": "OBV Structure",
 };
 
 export function Header() {

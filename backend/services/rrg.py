@@ -21,7 +21,9 @@ from backend.config import (
 )
 
 
-# ── In-memory cache ─────────────────────────────────────────────────
+# ── In-memory cache (bounded) ────────────────────────────────────────
+
+MAX_CACHE_ENTRIES = 30
 
 @dataclass
 class _CacheEntry:
@@ -43,7 +45,15 @@ def _cache_get(key: str) -> dict | None:
 
 
 def _cache_set(key: str, data: dict) -> None:
+    if len(_cache) >= MAX_CACHE_ENTRIES:
+        oldest_key = min(_cache, key=lambda k: _cache[k].ts)
+        del _cache[oldest_key]
     _cache[key] = _CacheEntry(data=data)
+
+
+def invalidate_cache() -> None:
+    """Clear all RRG in-memory caches."""
+    _cache.clear()
 
 
 # ── Helpers ──────────────────────────────────────────────────────────

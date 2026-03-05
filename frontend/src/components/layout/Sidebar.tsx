@@ -5,14 +5,30 @@ import {
   Globe,
   LineChart,
   Trophy,
+  BarChart3,
 } from "lucide-react";
 
-const navItems = [
-  { to: "/", label: "Dashboard", icon: LayoutDashboard },
-  { to: "/rrg/sectors", label: "Sector RRG", icon: Radar },
-  { to: "/rrg/cross-asset", label: "Cross-Asset RRG", icon: Globe },
-  { to: "/prices", label: "Price Explorer", icon: LineChart },
-  { to: "/rankings", label: "Rankings", icon: Trophy },
+const navGroups = [
+  {
+    label: null,
+    items: [{ to: "/", label: "Dashboard", icon: LayoutDashboard }],
+  },
+  {
+    label: "Analysis",
+    items: [
+      { to: "/rrg/sectors", label: "Sector RRG", icon: Radar },
+      { to: "/rrg/cross-asset", label: "Cross-Asset RRG", icon: Globe },
+      { to: "/rankings", label: "Rankings", icon: Trophy },
+    ],
+  },
+  {
+    label: "Volume",
+    items: [{ to: "/obv", label: "OBV Structure", icon: BarChart3 }],
+  },
+  {
+    label: "Data",
+    items: [{ to: "/prices", label: "Price Explorer", icon: LineChart }],
+  },
 ];
 
 export function Sidebar() {
@@ -23,18 +39,25 @@ export function Sidebar() {
         <span>Rotation Dashboard</span>
       </div>
       <nav className="sidebar-nav">
-        {navItems.map((item) => (
-          <NavLink
-            key={item.to}
-            to={item.to}
-            end={item.to === "/"}
-            className={({ isActive }) =>
-              `sidebar-link ${isActive ? "sidebar-link--active" : ""}`
-            }
-          >
-            <item.icon size={18} />
-            <span>{item.label}</span>
-          </NavLink>
+        {navGroups.map((group, gi) => (
+          <div key={gi} className="sidebar-group">
+            {group.label && (
+              <span className="sidebar-section-label">{group.label}</span>
+            )}
+            {group.items.map((item) => (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                end={item.to === "/"}
+                className={({ isActive }) =>
+                  `sidebar-link ${isActive ? "sidebar-link--active" : ""}`
+                }
+              >
+                <item.icon size={18} />
+                <span>{item.label}</span>
+              </NavLink>
+            ))}
+          </div>
         ))}
       </nav>
     </aside>

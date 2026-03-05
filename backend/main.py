@@ -12,7 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from backend.config import CORS_ORIGINS
 from backend.database import create_pool, close_pool
-from backend.routers import rrg, prices, tickers
+from backend.routers import rrg, prices, tickers, obv
 
 
 @asynccontextmanager
@@ -40,6 +40,7 @@ app.add_middleware(
 app.include_router(rrg.router, prefix="/api/rrg", tags=["RRG"])
 app.include_router(prices.router, prefix="/api/prices", tags=["Prices"])
 app.include_router(tickers.router, prefix="/api/tickers", tags=["Tickers"])
+app.include_router(obv.router, prefix="/api/obv", tags=["OBV"])
 
 
 @app.get("/api/health")
