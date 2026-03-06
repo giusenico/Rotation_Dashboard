@@ -1,6 +1,6 @@
 import Plot from "react-plotly.js";
 import type { CorrelationResponse } from "../../types/prices";
-import { useTheme } from "../../hooks/useTheme";
+import { cssVar } from "../../utils/cssVar";
 
 interface CorrelationHeatmapProps {
   data: CorrelationResponse;
@@ -8,13 +8,14 @@ interface CorrelationHeatmapProps {
 }
 
 export function CorrelationHeatmap({ data, height = 500 }: CorrelationHeatmapProps) {
-  const { theme } = useTheme();
-  const isDark = theme === "dark";
-  const bgColor = isDark ? "#0d1117" : "#ffffff";
-  const textColor = isDark ? "#8b949e" : "#656d76";
+  const bgColor = "rgba(0,0,0,0)";
+  const textColor = cssVar("--chart-text");
+  const dangerColor = cssVar("--danger");
+  const accentColor = cssVar("--accent");
+  const midColor = cssVar("--bg-secondary");
 
   return (
-    <div className="chart-container">
+    <div className="chart-container" style={{ height: `${height}px` }}>
       <Plot
         data={[
           {
@@ -23,9 +24,9 @@ export function CorrelationHeatmap({ data, height = 500 }: CorrelationHeatmapPro
             y: data.symbols,
             type: "heatmap",
             colorscale: [
-              [0, isDark ? "#f85149" : "#cf222e"],
-              [0.5, isDark ? "#21262d" : "#f6f8fa"],
-              [1, isDark ? "#58a6ff" : "#0969da"],
+              [0, dangerColor],
+              [0.5, midColor],
+              [1, accentColor],
             ],
             zmin: -1,
             zmax: 1,

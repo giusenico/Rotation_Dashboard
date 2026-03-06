@@ -1,6 +1,6 @@
 import Plot from "react-plotly.js";
 import type { PerformanceEntry } from "../../types/prices";
-import { useTheme } from "../../hooks/useTheme";
+import { cssVar } from "../../utils/cssVar";
 
 interface PerformanceBarChartProps {
   data: PerformanceEntry[];
@@ -18,24 +18,22 @@ const periodLabels: Record<string, string> = {
 };
 
 export function PerformanceBarChart({ data, period, height = 400 }: PerformanceBarChartProps) {
-  const { theme } = useTheme();
-  const isDark = theme === "dark";
-  const bgColor = isDark ? "#0d1117" : "#ffffff";
-  const gridColor = isDark ? "#21262d" : "#eaeef2";
-  const textColor = isDark ? "#8b949e" : "#656d76";
+  const bgColor = "rgba(0,0,0,0)";
+  const gridColor = cssVar("--chart-grid");
+  const textColor = cssVar("--chart-text");
+  const successColor = cssVar("--success");
+  const dangerColor = cssVar("--danger");
 
   const sorted = [...data]
     .filter((d) => d[period] != null)
     .sort((a, b) => (b[period] ?? 0) - (a[period] ?? 0));
 
   const colors = sorted.map((d) =>
-    (d[period] ?? 0) >= 0
-      ? isDark ? "#3fb950" : "#1a7f37"
-      : isDark ? "#f85149" : "#cf222e"
+    (d[period] ?? 0) >= 0 ? successColor : dangerColor
   );
 
   return (
-    <div className="chart-container">
+    <div className="chart-container" style={{ height: `${height}px` }}>
       <Plot
         data={[
           {

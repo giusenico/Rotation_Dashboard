@@ -1,13 +1,10 @@
 import { useState } from "react";
-import { useMultiPrices, useDrawdown, useCorrelation, usePerformance } from "../hooks/usePriceData";
+import { useMultiPrices, useDrawdown, useCorrelation, usePerformance, useTickers } from "../hooks/usePriceData";
 import { PriceLineChart } from "../components/charts/PriceLineChart";
 import { DrawdownChart } from "../components/charts/DrawdownChart";
 import { CorrelationHeatmap } from "../components/charts/CorrelationHeatmap";
 import { PerformanceBarChart } from "../components/charts/PerformanceBarChart";
 import { LoadingSpinner } from "../components/common/LoadingSpinner";
-
-const SECTOR_TICKERS = ["XLF", "XLV", "XLY", "XLC", "XLE", "XLI", "XLK", "XLU", "XLB", "XLRE", "XLP"];
-const CROSS_ASSET_TICKERS = ["BND", "IEF", "TLT", "SPYV", "SPEU", "EEMA", "ILF", "QQQ", "EWJ", "IWM", "GLD", "SLV", "SPYG", "IBIT"];
 
 type Tab = "prices" | "drawdown" | "correlation" | "performance";
 type Period = "return_1w" | "return_1m" | "return_3m" | "return_6m" | "return_ytd" | "return_1y";
@@ -26,7 +23,10 @@ export function PriceExplorerPage() {
   const [drawdownTicker, setDrawdownTicker] = useState("XLK");
   const [perfPeriod, setPerfPeriod] = useState<Period>("return_1m");
 
-  const selectedTickers = group === "sectors" ? SECTOR_TICKERS : CROSS_ASSET_TICKERS;
+  const { data: tickerGroups } = useTickers();
+  const sectorTickers = tickerGroups?.sectors ?? [];
+  const crossAssetTickers = tickerGroups?.crossAsset ?? [];
+  const selectedTickers = group === "sectors" ? sectorTickers : crossAssetTickers;
 
   const { data: priceData, isLoading: pricesLoading } = useMultiPrices(
     tab === "prices" ? selectedTickers : [],
@@ -93,7 +93,7 @@ export function PriceExplorerPage() {
             onChange={(e) => setDrawdownTicker(e.target.value)}
             className="select-input"
           >
-            {[...SECTOR_TICKERS, ...CROSS_ASSET_TICKERS].map((t) => (
+            {[...sectorTickers, ...crossAssetTickers].map((t) => (
               <option key={t} value={t}>{t}</option>
             ))}
           </select>

@@ -1,7 +1,7 @@
 import Plot from "react-plotly.js";
 import type { RRGPoint } from "../../types/rrg";
 import { getTickerColor } from "../../utils/colors";
-import { useTheme } from "../../hooks/useTheme";
+import { cssVar } from "../../utils/cssVar";
 
 interface RRGChartProps {
   data: RRGPoint[];
@@ -13,29 +13,34 @@ interface RRGChartProps {
 }
 
 export function RRGChart({ data, tickers, title, height = 600, compact = false }: RRGChartProps) {
-  const { theme } = useTheme();
-  const isDark = theme === "dark";
-
-  const bgColor = isDark ? "#0d1117" : "#ffffff";
-  const gridColor = isDark ? "#21262d" : "#eaeef2";
-  const textColor = isDark ? "#8b949e" : "#656d76";
-  const crosshairColor = isDark ? "#484f58" : "#b1bac4";
+  const bgColor = "rgba(0,0,0,0)";
+  const gridColor = cssVar("--chart-grid");
+  const textColor = cssVar("--chart-text");
+  const crosshairColor = cssVar("--text-muted");
 
   // Quadrant background colors (subtle)
-  const qLeading = isDark ? "rgba(63,185,80,0.06)" : "rgba(26,127,55,0.05)";
-  const qWeakening = isDark ? "rgba(210,153,34,0.06)" : "rgba(154,103,0,0.05)";
-  const qLagging = isDark ? "rgba(248,81,73,0.06)" : "rgba(207,34,46,0.05)";
-  const qImproving = isDark ? "rgba(88,166,255,0.06)" : "rgba(9,105,218,0.05)";
+  const qLeading = cssVar("--quadrant-leading");
+  const qWeakening = cssVar("--quadrant-weakening");
+  const qLagging = cssVar("--quadrant-lagging");
+  const qImproving = cssVar("--quadrant-improving");
+
+  // Quadrant label colors
+  const qLeadingText = cssVar("--quadrant-leading-text");
+  const qWeakeningText = cssVar("--quadrant-weakening-text");
+  const qLaggingText = cssVar("--quadrant-lagging-text");
+  const qImprovingText = cssVar("--quadrant-improving-text");
+
+  const borderColor = cssVar("--text-primary");
 
   const traces: Plotly.Data[] = [];
 
   // Compute axis range from data with padding
   const allRatios = data.map((d) => d.ratio);
   const allMomenta = data.map((d) => d.momentum);
-  const xMin = Math.min(...allRatios, 96);
-  const xMax = Math.max(...allRatios, 104);
-  const yMin = Math.min(...allMomenta, 96);
-  const yMax = Math.max(...allMomenta, 104);
+  const xMin = allRatios.length > 0 ? Math.min(...allRatios, 96) : 96;
+  const xMax = allRatios.length > 0 ? Math.max(...allRatios, 104) : 104;
+  const yMin = allMomenta.length > 0 ? Math.min(...allMomenta, 96) : 96;
+  const yMax = allMomenta.length > 0 ? Math.max(...allMomenta, 104) : 104;
   const xPad = (xMax - xMin) * 0.08;
   const yPad = (yMax - yMin) * 0.08;
 
@@ -70,7 +75,7 @@ export function RRGChart({ data, tickers, title, height = 600, compact = false }
       marker: {
         color,
         size: compact ? 9 : 12,
-        line: { color: isDark ? "#ffffff" : "#000000", width: 1.5 },
+        line: { color: borderColor, width: 1.5 },
         symbol: "circle",
       },
       text: [`<b>${ticker}</b>`],
@@ -172,7 +177,7 @@ export function RRGChart({ data, tickers, title, height = 600, compact = false }
         x: 0.98, y: 0.98,
         xref: "paper", yref: "paper",
         showarrow: false,
-        font: { size: labelSize, color: isDark ? "#3fb950" : "#1a7f37", family: "Arial Black, sans-serif" },
+        font: { size: labelSize, color: qLeadingText, family: "Arial Black, sans-serif" },
         opacity: 0.7,
       },
       {
@@ -180,7 +185,7 @@ export function RRGChart({ data, tickers, title, height = 600, compact = false }
         x: 0.98, y: 0.02,
         xref: "paper", yref: "paper",
         showarrow: false,
-        font: { size: labelSize, color: isDark ? "#d29922" : "#9a6700", family: "Arial Black, sans-serif" },
+        font: { size: labelSize, color: qWeakeningText, family: "Arial Black, sans-serif" },
         opacity: 0.7,
       },
       {
@@ -188,7 +193,7 @@ export function RRGChart({ data, tickers, title, height = 600, compact = false }
         x: 0.02, y: 0.02,
         xref: "paper", yref: "paper",
         showarrow: false,
-        font: { size: labelSize, color: isDark ? "#f85149" : "#cf222e", family: "Arial Black, sans-serif" },
+        font: { size: labelSize, color: qLaggingText, family: "Arial Black, sans-serif" },
         opacity: 0.7,
       },
       {
@@ -196,7 +201,7 @@ export function RRGChart({ data, tickers, title, height = 600, compact = false }
         x: 0.02, y: 0.98,
         xref: "paper", yref: "paper",
         showarrow: false,
-        font: { size: labelSize, color: isDark ? "#58a6ff" : "#0969da", family: "Arial Black, sans-serif" },
+        font: { size: labelSize, color: qImprovingText, family: "Arial Black, sans-serif" },
         opacity: 0.7,
       },
     ],

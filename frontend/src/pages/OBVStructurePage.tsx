@@ -2,11 +2,11 @@ import { useState } from "react";
 import Plot from "react-plotly.js";
 import { useOBVDetail, useOBVScoreHistory, useOBVStructure } from "../hooks/useOBVData";
 import { LoadingSpinner } from "../components/common/LoadingSpinner";
-import { useTheme } from "../hooks/useTheme";
 import { formatPct, formatNum } from "../utils/formatters";
 import type { OBVStructureEntry } from "../types/obv";
 import { TrendingUp, TrendingDown, Activity, Award, X } from "lucide-react";
 import { getTickerColor } from "../utils/colors";
+import { cssVar } from "../utils/cssVar";
 
 // ── Shared helpers ────────────────────────────────────────────────────
 
@@ -45,7 +45,7 @@ function OBVSummaryCards({ data }: { data: OBVStructureEntry[] }) {
   return (
     <div className="summary-cards" style={{ marginBottom: 20 }}>
       <div className="card">
-        <div className="card-icon" style={{ background: "rgba(63,185,80,0.1)", color: "var(--success)" }}>
+        <div className="card-icon" style={{ color: "var(--success)" }}>
           <TrendingUp size={20} />
         </div>
         <div className="card-content">
@@ -54,7 +54,7 @@ function OBVSummaryCards({ data }: { data: OBVStructureEntry[] }) {
         </div>
       </div>
       <div className="card">
-        <div className="card-icon" style={{ background: "rgba(248,81,73,0.1)", color: "var(--danger)" }}>
+        <div className="card-icon" style={{ color: "var(--danger)" }}>
           <TrendingDown size={20} />
         </div>
         <div className="card-content">
@@ -96,14 +96,12 @@ function OBVSummaryCards({ data }: { data: OBVStructureEntry[] }) {
 type HistoryLookback = 63 | 126 | 252 | 504;
 
 function ScoreHistoryChart() {
-  const { theme } = useTheme();
-  const isDark = theme === "dark";
   const [lookback, setLookback] = useState<HistoryLookback>(252);
 
   const { data, isLoading } = useOBVScoreHistory(undefined, lookback);
 
-  const bgColor = isDark ? "#0d1117" : "#ffffff";
-  const textColor = isDark ? "#8b949e" : "#656d76";
+  const bgColor = "rgba(0,0,0,0)";
+  const textColor = cssVar("--chart-text");
 
   const LOOKBACK_OPTIONS: { label: string; value: HistoryLookback }[] = [
     { label: "3M", value: 63 },
@@ -172,11 +170,11 @@ function ScoreHistoryChart() {
                 z: heatmapData.z,
                 type: "heatmap" as const,
                 colorscale: [
-                  [0, isDark ? "#b62324" : "#cf222e"],
-                  [0.25, isDark ? "#8b3a3a" : "#e0969a"],
-                  [0.5, isDark ? "#1a1e24" : "#f0f0f0"],
-                  [0.75, isDark ? "#2a5a30" : "#90d498"],
-                  [1, isDark ? "#2ea043" : "#2da44e"],
+                  [0, cssVar("--danger")],
+                  [0.25, cssVar("--bg-tertiary")],
+                  [0.5, cssVar("--bg-secondary")],
+                  [0.75, cssVar("--bg-tertiary")],
+                  [1, cssVar("--success")],
                 ],
                 zmin: -1,
                 zmax: 1,
@@ -225,14 +223,12 @@ function ScoreHistoryChart() {
 type SpreadLookback = 63 | 126 | 252;
 
 function SpreadPanels({ data }: { data: OBVStructureEntry[] }) {
-  const { theme } = useTheme();
-  const isDark = theme === "dark";
   const [lookback, setLookback] = useState<SpreadLookback>(252);
 
-  const bgColor = isDark ? "#0d1117" : "#ffffff";
-  const textColor = isDark ? "#8b949e" : "#656d76";
-  const greenColor = isDark ? "#3fb950" : "#2da44e";
-  const redColor = isDark ? "#f85149" : "#cf222e";
+  const bgColor = "rgba(0,0,0,0)";
+  const textColor = cssVar("--chart-text");
+  const greenColor = cssVar("--success");
+  const redColor = cssVar("--danger");
 
   const LOOKBACK_OPTIONS: { label: string; value: SpreadLookback }[] = [
     { label: "3M", value: 63 },
@@ -309,7 +305,7 @@ function SpreadPanels({ data }: { data: OBVStructureEntry[] }) {
     const y0 = 1 - sp.row * rowFrac + (sp.row < rows ? gap / 2 : 0);
     const y1 = 1 - (sp.row - 1) * rowFrac - (sp.row > 1 ? gap / 2 : 0);
     layoutAxes[xKey] = { domain: [x0, x1], anchor: i === 0 ? "y" : `y${i + 1}`, showticklabels: false, showgrid: false };
-    layoutAxes[yKey] = { domain: [y0, y1], anchor: i === 0 ? "x" : `x${i + 1}`, showticklabels: false, showgrid: false, zeroline: true, zerolinecolor: isDark ? "#30363d" : "#d0d7de", zerolinewidth: 1 };
+    layoutAxes[yKey] = { domain: [y0, y1], anchor: i === 0 ? "x" : `x${i + 1}`, showticklabels: false, showgrid: false, zeroline: true, zerolinecolor: cssVar("--zeroline"), zerolinewidth: 1 };
   });
 
   return (
@@ -355,17 +351,16 @@ function SpreadPanels({ data }: { data: OBVStructureEntry[] }) {
 type DetailLookback = 63 | 126 | 252;
 
 function DetailModal({ symbol, onClose }: { symbol: string; onClose: () => void }) {
-  const { theme } = useTheme();
-  const isDark = theme === "dark";
   const [lookback, setLookback] = useState<DetailLookback>(252);
 
   const { data, isLoading } = useOBVDetail(symbol, lookback);
 
-  const bgColor = isDark ? "#0d1117" : "#ffffff";
-  const gridColor = isDark ? "#21262d" : "#eaeef2";
-  const textColor = isDark ? "#8b949e" : "#656d76";
-  const greenColor = isDark ? "#3fb950" : "#2da44e";
-  const redColor = isDark ? "#f85149" : "#cf222e";
+  const bgColor = "rgba(0,0,0,0)";
+  const gridColor = cssVar("--chart-grid");
+  const textColor = cssVar("--chart-text");
+  const greenColor = cssVar("--success");
+  const redColor = cssVar("--danger");
+  const zeroLine = cssVar("--zeroline");
   const tickerColor = getTickerColor(symbol);
 
   const LOOKBACK_OPTIONS: { label: string; value: DetailLookback }[] = [
@@ -450,10 +445,10 @@ function DetailModal({ symbol, onClose }: { symbol: string; onClose: () => void 
                   margin: { l: 55, r: 16, t: 10, b: 40 },
                   barmode: "overlay", bargap: 0,
                   xaxis: { gridcolor: gridColor, color: textColor, tickfont: { color: textColor, size: 10 } },
-                  yaxis: { gridcolor: gridColor, color: textColor, tickfont: { color: textColor, size: 10 }, zeroline: true, zerolinecolor: isDark ? "#484f58" : "#b1bac4", title: { text: "Spread", font: { color: textColor, size: 10 } } },
+                  yaxis: { gridcolor: gridColor, color: textColor, tickfont: { color: textColor, size: 10 }, zeroline: true, zerolinecolor: zeroLine, title: { text: "Spread", font: { color: textColor, size: 10 } } },
                 }}
                 config={{ responsive: true, displayModeBar: false, displaylogo: false }}
-                useResizeHandler style={{ width: "100%", height: "100%" }}
+                useResizeHandler style={{ width: "100%", height: 220 }}
               />
             </div>
 
@@ -470,8 +465,8 @@ function DetailModal({ symbol, onClose }: { symbol: string; onClose: () => void 
                       line: { color: tickerColor, width: 2 },
                       fill: "tozeroy",
                       fillcolor: (data.rotation_score ?? 0) >= 0
-                        ? isDark ? "rgba(63,185,80,0.12)" : "rgba(26,127,55,0.08)"
-                        : isDark ? "rgba(248,81,73,0.12)" : "rgba(207,34,46,0.08)",
+                        ? cssVar("--positive-fill-strong")
+                        : cssVar("--negative-fill-strong"),
                       showlegend: false,
                       hovertemplate: `%{x}<br>Score: %{y:.3f}<extra></extra>`,
                     },
@@ -480,14 +475,14 @@ function DetailModal({ symbol, onClose }: { symbol: string; onClose: () => void 
                     paper_bgcolor: bgColor, plot_bgcolor: bgColor, height: 200,
                     margin: { l: 55, r: 16, t: 10, b: 40 },
                     xaxis: { gridcolor: gridColor, color: textColor, tickfont: { color: textColor, size: 10 } },
-                    yaxis: { gridcolor: gridColor, color: textColor, tickfont: { color: textColor, size: 10 }, zeroline: true, zerolinecolor: isDark ? "#484f58" : "#b1bac4", range: [-1.05, 1.05], title: { text: "Score", font: { color: textColor, size: 10 } } },
+                    yaxis: { gridcolor: gridColor, color: textColor, tickfont: { color: textColor, size: 10 }, zeroline: true, zerolinecolor: zeroLine, range: [-1.05, 1.05], title: { text: "Score", font: { color: textColor, size: 10 } } },
                     shapes: [
-                      { type: "rect", x0: 0, x1: 1, xref: "paper", y0: 0, y1: 1.05, fillcolor: isDark ? "rgba(63,185,80,0.04)" : "rgba(26,127,55,0.03)", line: { width: 0 }, layer: "below" },
-                      { type: "rect", x0: 0, x1: 1, xref: "paper", y0: -1.05, y1: 0, fillcolor: isDark ? "rgba(248,81,73,0.04)" : "rgba(207,34,46,0.03)", line: { width: 0 }, layer: "below" },
+                      { type: "rect", x0: 0, x1: 1, xref: "paper", y0: 0, y1: 1.05, fillcolor: cssVar("--positive-fill"), line: { width: 0 }, layer: "below" },
+                      { type: "rect", x0: 0, x1: 1, xref: "paper", y0: -1.05, y1: 0, fillcolor: cssVar("--negative-fill"), line: { width: 0 }, layer: "below" },
                     ],
                   }}
                   config={{ responsive: true, displayModeBar: false, displaylogo: false }}
-                  useResizeHandler style={{ width: "100%", height: "100%" }}
+                  useResizeHandler style={{ width: "100%", height: 200 }}
                 />
               </div>
             ) : (
@@ -517,7 +512,7 @@ function DetailModal({ symbol, onClose }: { symbol: string; onClose: () => void 
                   yaxis: { gridcolor: gridColor, color: textColor, tickfont: { color: textColor, size: 10 }, title: { text: "OBV", font: { color: textColor, size: 10 } } },
                 }}
                 config={{ responsive: true, displayModeBar: false, displaylogo: false }}
-                useResizeHandler style={{ width: "100%", height: "100%" }}
+                useResizeHandler style={{ width: "100%", height: 180 }}
               />
             </div>
           </div>

@@ -6,6 +6,8 @@ import {
   fetchCorrelation,
   fetchDashboardSummary,
 } from "../api/prices";
+import { fetchTickers } from "../api/tickers";
+import type { TickerInfo } from "../types/prices";
 
 export function usePerformance(symbols = "all") {
   return useQuery({
@@ -47,5 +49,21 @@ export function useDashboardSummary() {
     queryKey: ["dashboard", "summary"],
     queryFn: fetchDashboardSummary,
     staleTime: 5 * 60 * 1000,
+  });
+}
+
+export function useTickers() {
+  return useQuery({
+    queryKey: ["tickers"],
+    queryFn: () => fetchTickers(),
+    staleTime: 30 * 60 * 1000,
+    select: (data: TickerInfo[]) => {
+      const sectors = data.filter((t) => t.category === "Sector ETF").map((t) => t.symbol);
+      const crossAsset = data
+        .filter((t) => t.category !== "Sector ETF" && t.category !== "Benchmark")
+        .map((t) => t.symbol);
+      const all = [...sectors, ...crossAsset];
+      return { sectors, crossAsset, all };
+    },
   });
 }

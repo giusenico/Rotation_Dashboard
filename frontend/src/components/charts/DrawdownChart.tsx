@@ -1,6 +1,6 @@
 import Plot from "react-plotly.js";
 import type { DrawdownResponse } from "../../types/prices";
-import { useTheme } from "../../hooks/useTheme";
+import { cssVar } from "../../utils/cssVar";
 
 interface DrawdownChartProps {
   data: DrawdownResponse;
@@ -8,16 +8,14 @@ interface DrawdownChartProps {
 }
 
 export function DrawdownChart({ data, height = 350 }: DrawdownChartProps) {
-  const { theme } = useTheme();
-  const isDark = theme === "dark";
-  const bgColor = isDark ? "#0d1117" : "#ffffff";
-  const gridColor = isDark ? "#21262d" : "#eaeef2";
-  const textColor = isDark ? "#8b949e" : "#656d76";
-  const fillColor = isDark ? "rgba(248, 81, 73, 0.3)" : "rgba(207, 34, 46, 0.2)";
-  const lineColor = isDark ? "#f85149" : "#cf222e";
+  const bgColor = "rgba(0,0,0,0)";
+  const gridColor = cssVar("--chart-grid");
+  const textColor = cssVar("--chart-text");
+  const fillColor = cssVar("--negative-fill-strong");
+  const lineColor = cssVar("--danger");
 
   return (
-    <div className="chart-container">
+    <div className="chart-container" style={{ height: `${height}px` }}>
       <Plot
         data={[
           {
