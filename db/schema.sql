@@ -41,6 +41,22 @@ CREATE TABLE IF NOT EXISTS daily_prices (
 CREATE INDEX IF NOT EXISTS idx_daily_prices_symbol_date
     ON daily_prices (symbol, date DESC);
 
+-- Intraday 4-hour OHLCV data (resampled from 1h Yahoo Finance data)
+CREATE TABLE IF NOT EXISTS intraday_prices_4h (
+    id        INTEGER PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
+    symbol    TEXT    NOT NULL REFERENCES tickers (symbol),
+    datetime  TIMESTAMPTZ NOT NULL,
+    open      DOUBLE PRECISION,
+    high      DOUBLE PRECISION,
+    low       DOUBLE PRECISION,
+    close     DOUBLE PRECISION,
+    volume    BIGINT,
+    UNIQUE (symbol, datetime)
+);
+
+CREATE INDEX IF NOT EXISTS idx_intraday_4h_symbol_datetime
+    ON intraday_prices_4h (symbol, datetime DESC);
+
 -- OBV structure metrics (computed daily for cross-asset ETFs)
 CREATE TABLE IF NOT EXISTS obv_daily_metrics (
     date            DATE    NOT NULL,

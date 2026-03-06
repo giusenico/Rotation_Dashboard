@@ -65,6 +65,8 @@ SECTOR_ETFS = {
 # ---------------------------------------------------------------------------
 CROSS_ASSET_ETFS = {
     "BND": "US Aggregate Bond Market",
+    "SHY": "1-3 Year US Treasury Bonds",
+    "SHV": "Short Treasury Bonds (0-1 Year)",
     "IEF": "7-10 Year US Treasury Bonds",
     "TLT": "20+ Year US Treasury Bonds",
     "SPYV": "S&P 500 Value",
@@ -76,6 +78,8 @@ CROSS_ASSET_ETFS = {
     "IWM": "US Small Caps (Russell 2000)",
     "GLD": "Gold",
     "SLV": "Silver",
+    "USO": "US Crude Oil (WTI)",
+    "BNO": "Brent Crude Oil",
     "SPYG": "S&P 500 Growth",
     "IBIT": "iShares Bitcoin Trust",
 }
@@ -94,9 +98,9 @@ for sym in SECTOR_ETFS:
     TICKER_CATEGORY_MAP[sym] = "Sector ETF"
 
 for sym, label in CROSS_ASSET_ETFS.items():
-    if sym in ("BND", "IEF", "TLT"):
+    if sym in ("BND", "SHY", "SHV", "IEF", "TLT"):
         TICKER_CATEGORY_MAP[sym] = "Bond ETF"
-    elif sym in ("GLD", "SLV"):
+    elif sym in ("GLD", "SLV", "USO", "BNO"):
         TICKER_CATEGORY_MAP[sym] = "Commodity ETF"
     elif sym == "IBIT":
         TICKER_CATEGORY_MAP[sym] = "Crypto ETF"
