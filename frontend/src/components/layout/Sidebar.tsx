@@ -4,8 +4,8 @@ import {
   Radar,
   Globe,
   LineChart,
-  Trophy,
   BarChart3,
+  Gauge,
 } from "lucide-react";
 
 const navGroups = [
@@ -14,16 +14,23 @@ const navGroups = [
     items: [{ to: "/", label: "Dashboard", icon: LayoutDashboard }],
   },
   {
-    label: "Analysis",
+    label: "Rotation",
     items: [
-      { to: "/rrg/sectors", label: "Sector RRG", icon: Radar },
-      { to: "/rrg/cross-asset", label: "Cross-Asset RRG", icon: Globe },
-      { to: "/rankings", label: "Rankings", icon: Trophy },
+      { to: "/rrg/sectors", label: "Sectors", icon: Radar },
+      { to: "/rrg/cross-asset", label: "Cross-Asset", icon: Globe },
     ],
   },
   {
-    label: "Volume",
-    items: [{ to: "/obv", label: "OBV Structure", icon: BarChart3 }],
+    label: "Flow",
+    items: [
+      { to: "/obv", label: "Capital Flow Structure", icon: BarChart3 },
+    ],
+  },
+  {
+    label: "Momentum",
+    items: [
+      { to: "/regime", label: "Market Regime", icon: Gauge },
+    ],
   },
   {
     label: "Data",

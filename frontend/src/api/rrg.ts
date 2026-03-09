@@ -5,6 +5,7 @@ interface RRGParams {
   trail_length?: number;
   rs_span?: number;
   momentum_span?: number;
+  timeframe?: string;
 }
 
 export function fetchSectorRRG(params?: RRGParams) {
@@ -15,10 +16,10 @@ export function fetchCrossAssetRRG(params?: RRGParams) {
   return apiFetch<RRGResponse>("/api/rrg/cross-asset", params as Record<string, number>);
 }
 
-export function fetchSectorRankings() {
-  return apiFetch<RankingEntry[]>("/api/rrg/rankings/sectors");
+export function fetchSectorRankings(params?: { timeframe?: string }) {
+  return apiFetch<RankingEntry[]>("/api/rrg/rankings/sectors", params as Record<string, string>);
 }
 
-export function fetchCrossAssetRankings() {
-  return apiFetch<RankingEntry[]>("/api/rrg/rankings/cross-asset");
+export function fetchCrossAssetRankings(params?: { timeframe?: string }) {
+  return apiFetch<RankingEntry[]>("/api/rrg/rankings/cross-asset", params as Record<string, string>);
 }

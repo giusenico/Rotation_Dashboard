@@ -15,9 +15,9 @@ import pandas as pd
 from backend.config import (
     SECTOR_ETFS,
     CROSS_ASSET_ETFS,
-    BENCHMARK,
     ALL_TICKERS,
     CACHE_TTL,
+    TICKER_CATEGORY_MAP,
 )
 
 
@@ -78,6 +78,26 @@ def _fetch_adj_close(conn, symbols: list[str]) -> pd.DataFrame:
     return df
 
 
+def _fetch_intraday_close(conn, symbols: list[str]) -> pd.DataFrame:
+    """Fetch close prices from intraday_prices_4h and return a pivoted DataFrame."""
+    placeholders = ",".join(["%s"] * len(symbols))
+    query = f"""
+        SELECT symbol, datetime, close
+        FROM intraday_prices_4h
+        WHERE symbol IN ({placeholders})
+        ORDER BY datetime
+    """
+    with conn.cursor() as cur:
+        cur.execute(query, symbols)
+        rows = cur.fetchall()
+
+    df = pd.DataFrame(rows, columns=["symbol", "datetime", "close"])
+    df["datetime"] = pd.to_datetime(df["datetime"], utc=True)
+    df = df.pivot(index="datetime", columns="symbol", values="close").sort_index()
+    df = df.ffill()
+    return df
+
+
 def assign_quadrant(ratio: float, momentum: float) -> str:
     if ratio >= 100 and momentum >= 100:
         return "Leading"
@@ -97,6 +117,7 @@ def compute_rrg(
     rs_span: int = 20,
     momentum_span: int = 10,
     trail_length: int = 5,
+    timeframe: str = "weekly",
 ) -> dict:
     """
     Compute RRG coordinates for a set of tickers relative to a benchmark.
@@ -104,7 +125,13 @@ def compute_rrg(
     Returns a dict ready for serialisation as RRGResponse.
     """
     symbols = list(ticker_map.keys()) + [benchmark_symbol]
-    df = _fetch_adj_close(conn, symbols)
+
+    if timeframe == "4h":
+        df = _fetch_intraday_close(conn, symbols)
+    else:
+        df = _fetch_adj_close(conn, symbols)
+        if timeframe == "weekly":
+            df = df.resample("W").last()
 
     if benchmark_symbol not in df.columns:
         return {
@@ -133,6 +160,8 @@ def compute_rrg(
     ratio_tail = rel_ratio.tail(trail_length)
     momentum_tail = momentum.tail(trail_length)
 
+    date_fmt = "%Y-%m-%d %H:%M" if timeframe == "4h" else "%Y-%m-%d"
+
     data_points = []
     for ticker in available:
         name = ticker_map.get(ticker, ticker)
@@ -143,12 +172,12 @@ def compute_rrg(
                 data_points.append({
                     "ticker": ticker,
                     "name": name,
-                    "date": date_idx.strftime("%Y-%m-%d"),
+                    "date": date_idx.strftime(date_fmt),
                     "ratio": round(float(r), 4),
                     "momentum": round(float(m), 4),
                 })
 
-    as_of = ratio_tail.index[-1].strftime("%Y-%m-%d") if len(ratio_tail) > 0 else ""
+    as_of = ratio_tail.index[-1].strftime(date_fmt) if len(ratio_tail) > 0 else ""
 
     return {
         "benchmark": benchmark_symbol,
@@ -160,9 +189,9 @@ def compute_rrg(
     }
 
 
-def compute_rankings(conn, ticker_map: dict[str, str], benchmark_symbol: str = "^GSPC") -> list[dict]:
+def compute_rankings(conn, ticker_map: dict[str, str], benchmark_symbol: str = "^GSPC", timeframe: str = "weekly") -> list[dict]:
     """Compute RRG rankings sorted by score (ratio + momentum) descending."""
-    result = compute_rrg(conn, ticker_map, benchmark_symbol, trail_length=1)
+    result = compute_rrg(conn, ticker_map, benchmark_symbol, trail_length=1, timeframe=timeframe)
     if not result["data"]:
         return []
 
@@ -170,8 +199,6 @@ def compute_rankings(conn, ticker_map: dict[str, str], benchmark_symbol: str = "
     entries = []
     for pt in result["data"]:
         score = pt["ratio"] + pt["momentum"]
-        cat = ""
-        from backend.config import TICKER_CATEGORY_MAP
         cat = TICKER_CATEGORY_MAP.get(pt["ticker"], "")
         entries.append({
             "ticker": pt["ticker"],
@@ -192,41 +219,41 @@ def compute_rankings(conn, ticker_map: dict[str, str], benchmark_symbol: str = "
 
 # ── Cached public API ────────────────────────────────────────────────
 
-def get_sector_rrg(conn, trail_length: int = 5, rs_span: int = 20, momentum_span: int = 10) -> dict:
-    cache_key = f"sector_rrg_{trail_length}_{rs_span}_{momentum_span}"
+def get_sector_rrg(conn, trail_length: int = 5, rs_span: int = 20, momentum_span: int = 10, timeframe: str = "weekly") -> dict:
+    cache_key = f"sector_rrg_{trail_length}_{rs_span}_{momentum_span}_{timeframe}"
     cached = _cache_get(cache_key)
     if cached:
         return cached
-    result = compute_rrg(conn, SECTOR_ETFS, trail_length=trail_length, rs_span=rs_span, momentum_span=momentum_span)
+    result = compute_rrg(conn, SECTOR_ETFS, trail_length=trail_length, rs_span=rs_span, momentum_span=momentum_span, timeframe=timeframe)
     _cache_set(cache_key, result)
     return result
 
 
-def get_cross_asset_rrg(conn, trail_length: int = 5, rs_span: int = 20, momentum_span: int = 10) -> dict:
-    cache_key = f"cross_asset_rrg_{trail_length}_{rs_span}_{momentum_span}"
+def get_cross_asset_rrg(conn, trail_length: int = 5, rs_span: int = 20, momentum_span: int = 10, timeframe: str = "weekly") -> dict:
+    cache_key = f"cross_asset_rrg_{trail_length}_{rs_span}_{momentum_span}_{timeframe}"
     cached = _cache_get(cache_key)
     if cached:
         return cached
-    result = compute_rrg(conn, CROSS_ASSET_ETFS, trail_length=trail_length, rs_span=rs_span, momentum_span=momentum_span)
+    result = compute_rrg(conn, CROSS_ASSET_ETFS, trail_length=trail_length, rs_span=rs_span, momentum_span=momentum_span, timeframe=timeframe)
     _cache_set(cache_key, result)
     return result
 
 
-def get_sector_rankings(conn) -> list[dict]:
-    cache_key = "sector_rankings"
+def get_sector_rankings(conn, timeframe: str = "weekly") -> list[dict]:
+    cache_key = f"sector_rankings_{timeframe}"
     cached = _cache_get(cache_key)
     if cached:
         return cached
-    result = compute_rankings(conn, SECTOR_ETFS)
+    result = compute_rankings(conn, SECTOR_ETFS, timeframe=timeframe)
     _cache_set(cache_key, result)
     return result
 
 
-def get_cross_asset_rankings(conn) -> list[dict]:
-    cache_key = "cross_asset_rankings"
+def get_cross_asset_rankings(conn, timeframe: str = "weekly") -> list[dict]:
+    cache_key = f"cross_asset_rankings_{timeframe}"
     cached = _cache_get(cache_key)
     if cached:
         return cached
-    result = compute_rankings(conn, CROSS_ASSET_ETFS)
+    result = compute_rankings(conn, CROSS_ASSET_ETFS, timeframe=timeframe)
     _cache_set(cache_key, result)
     return result

@@ -34,4 +34,4 @@ jobs:
       - name: Update OBV daily metrics
         env:
           SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
-        run: python scripts/update_obv.py
+        run: python scripts/update_flow.py

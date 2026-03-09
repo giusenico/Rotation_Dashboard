@@ -19,9 +19,10 @@ def sector_rrg(
     trail_length: int = Query(5, ge=1, le=30),
     rs_span: int = Query(20, ge=5, le=50),
     momentum_span: int = Query(10, ge=5, le=30),
+    timeframe: str = Query("weekly", pattern="^(daily|weekly|4h)$"),
     conn=Depends(get_db),
 ):
-    return get_sector_rrg(conn, trail_length, rs_span, momentum_span)
+    return get_sector_rrg(conn, trail_length, rs_span, momentum_span, timeframe)
 
 
 @router.get("/cross-asset", response_model=RRGResponse)
@@ -29,16 +30,23 @@ def cross_asset_rrg(
     trail_length: int = Query(5, ge=1, le=30),
     rs_span: int = Query(20, ge=5, le=50),
     momentum_span: int = Query(10, ge=5, le=30),
+    timeframe: str = Query("weekly", pattern="^(daily|weekly|4h)$"),
     conn=Depends(get_db),
 ):
-    return get_cross_asset_rrg(conn, trail_length, rs_span, momentum_span)
+    return get_cross_asset_rrg(conn, trail_length, rs_span, momentum_span, timeframe)
 
 
 @router.get("/rankings/sectors", response_model=list[RankingEntry])
-def sector_rankings(conn=Depends(get_db)):
-    return get_sector_rankings(conn)
+def sector_rankings(
+    timeframe: str = Query("weekly", pattern="^(daily|weekly|4h)$"),
+    conn=Depends(get_db),
+):
+    return get_sector_rankings(conn, timeframe)
 
 
 @router.get("/rankings/cross-asset", response_model=list[RankingEntry])
-def cross_asset_rankings(conn=Depends(get_db)):
-    return get_cross_asset_rankings(conn)
+def cross_asset_rankings(
+    timeframe: str = Query("weekly", pattern="^(daily|weekly|4h)$"),
+    conn=Depends(get_db),
+):
+    return get_cross_asset_rankings(conn, timeframe)

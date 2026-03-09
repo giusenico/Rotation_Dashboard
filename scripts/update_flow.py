@@ -6,7 +6,7 @@ into the obv_daily_metrics table.
 Intended to run right after fetch_data.py in the daily GitHub Actions workflow.
 
 Usage:
-    python scripts/update_obv.py
+    python scripts/update_flow.py
 """
 
 import os
@@ -21,7 +21,7 @@ from scipy.stats import rankdata
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from config import CROSS_ASSET_ETFS, SUPABASE_DB_URL
 
-# Constants (must match backfill_obv.py / backend/services/obv.py)
+# Constants (must match backend/services/flow.py)
 OBV_SMA_LEN = 50
 RANK_LOOKBACK = 252
 ROC_LEN = 20
@@ -90,8 +90,9 @@ def main() -> None:
             spread_vol = spread.rolling(RANK_LOOKBACK).std()
 
             z_momo = np.nan
-            if len(spread) > ROC_LEN and spread_vol.iloc[-1] not in (0, np.nan):
-                z_momo = float(np.tanh(roc.iloc[-1] / (spread_vol.iloc[-1] + 1e-9)))
+            last_vol = spread_vol.iloc[-1]
+            if len(spread) > ROC_LEN and last_vol != 0 and not pd.isna(last_vol):
+                z_momo = float(np.tanh(roc.iloc[-1] / (last_vol + 1e-9)))
 
             mean_val = np.nanmean([spread_pctl, z_momo])
             score = float(np.clip(mean_val, -1, 1)) if not np.isnan(mean_val) else None

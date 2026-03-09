@@ -138,6 +138,7 @@ class OBVDetailResponse(BaseModel):
     symbol: str
     asset: str
     obv_regime: str
+    last_price: float | None = None
     rotation_score: float | None = None
     spread_percentile: float | None = None
     spread_momentum_z: float | None = None
@@ -158,3 +159,45 @@ class DashboardSummary(BaseModel):
     sector_leader: RankingEntry | None = None
     cross_asset_leader: RankingEntry | None = None
     sp500_return_ytd: float | None = None
+
+
+# ── Market Regime ───────────────────────────────────────────────────
+
+class RegimeSummaryEntry(BaseModel):
+    symbol: str
+    asset: str
+    category: str
+    last_price: float | None = None
+    regime: int
+    regime_label: str
+    overextension: float | None = None
+    overext_label: str
+    capital_flow_z: float | None = None
+    flow_label: str
+    sma_value: float | None = None
+
+
+class RegimeTimePoint(BaseModel):
+    date: str
+    value: float | None = None
+
+
+class RegimePricePoint(BaseModel):
+    date: str
+    close: float | None = None
+    sma: float | None = None
+
+
+class RegimeDetailResponse(BaseModel):
+    symbol: str
+    asset: str
+    last_price: float | None = None
+    regime_current: int
+    overext_current: float | None = None
+    overext_threshold: float
+    flow_z_current: float | None = None
+    flow_threshold: float
+    price_series: list[RegimePricePoint]
+    regime_series: list[RegimeTimePoint]
+    overext_series: list[RegimeTimePoint]
+    flow_series: list[RegimeTimePoint]

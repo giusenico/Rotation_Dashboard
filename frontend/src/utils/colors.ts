@@ -27,6 +27,10 @@ export const TICKER_COLORS: Record<string, string> = {
   SLV: "#C0C0C0",
   SPYG: "#52B788",
   IBIT: "#F7931A",
+  SHY: "#7EC8E3",
+  SHV: "#B8D4E3",
+  USO: "#D4A574",
+  BNO: "#C68B59",
 };
 
 /** Fallback color for unknown tickers. */

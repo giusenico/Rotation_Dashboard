@@ -6,6 +6,7 @@
 --   2. tickers             – instrument metadata
 --   3. daily_prices        – OHLCV + adjusted close time-series
 --   4. obv_daily_metrics   – OBV structure scores (daily)
+--   5. intraday_prices_4h  – 4-hour OHLCV candles
 -- ============================================================
 
 -- Categories for classifying tracked instruments
@@ -25,7 +26,6 @@ CREATE TABLE IF NOT EXISTS tickers (
 
 -- Daily OHLCV price data
 CREATE TABLE IF NOT EXISTS daily_prices (
-    id        INTEGER PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
     symbol    TEXT    NOT NULL REFERENCES tickers (symbol),
     date      TEXT    NOT NULL,   -- ISO-8601 format (YYYY-MM-DD)
     open      DOUBLE PRECISION,
@@ -34,16 +34,11 @@ CREATE TABLE IF NOT EXISTS daily_prices (
     close     DOUBLE PRECISION,
     adj_close DOUBLE PRECISION,
     volume    BIGINT,
-    UNIQUE (symbol, date)
+    PRIMARY KEY (symbol, date)
 );
-
--- Index for fast lookups by symbol and date range (DESC for time-series queries)
-CREATE INDEX IF NOT EXISTS idx_daily_prices_symbol_date
-    ON daily_prices (symbol, date DESC);
 
 -- Intraday 4-hour OHLCV data (resampled from 1h Yahoo Finance data)
 CREATE TABLE IF NOT EXISTS intraday_prices_4h (
-    id        INTEGER PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
     symbol    TEXT    NOT NULL REFERENCES tickers (symbol),
     datetime  TIMESTAMPTZ NOT NULL,
     open      DOUBLE PRECISION,
@@ -51,11 +46,8 @@ CREATE TABLE IF NOT EXISTS intraday_prices_4h (
     low       DOUBLE PRECISION,
     close     DOUBLE PRECISION,
     volume    BIGINT,
-    UNIQUE (symbol, datetime)
+    PRIMARY KEY (symbol, datetime)
 );
-
-CREATE INDEX IF NOT EXISTS idx_intraday_4h_symbol_datetime
-    ON intraday_prices_4h (symbol, datetime DESC);
 
 -- OBV structure metrics (computed daily for cross-asset ETFs)
 CREATE TABLE IF NOT EXISTS obv_daily_metrics (
@@ -68,6 +60,3 @@ CREATE TABLE IF NOT EXISTS obv_daily_metrics (
     rotation_score  REAL,               -- composite score [-1, +1]
     PRIMARY KEY (date, symbol)
 );
-
-CREATE INDEX IF NOT EXISTS idx_obv_metrics_symbol_date
-    ON obv_daily_metrics (symbol, date DESC);

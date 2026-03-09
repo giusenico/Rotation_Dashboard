@@ -5,6 +5,7 @@ interface RRGParams {
   trail_length?: number;
   rs_span?: number;
   momentum_span?: number;
+  timeframe?: string;
 }
 
 export function useSectorRRG(params?: RRGParams) {
@@ -25,18 +26,18 @@ export function useCrossAssetRRG(params?: RRGParams) {
   });
 }
 
-export function useSectorRankings() {
+export function useSectorRankings(timeframe: string = "weekly") {
   return useQuery({
-    queryKey: ["rrg", "rankings", "sectors"],
-    queryFn: fetchSectorRankings,
+    queryKey: ["rrg", "rankings", "sectors", timeframe],
+    queryFn: () => fetchSectorRankings({ timeframe }),
     staleTime: 5 * 60 * 1000,
   });
 }
 
-export function useCrossAssetRankings() {
+export function useCrossAssetRankings(timeframe: string = "weekly") {
   return useQuery({
-    queryKey: ["rrg", "rankings", "cross-asset"],
-    queryFn: fetchCrossAssetRankings,
+    queryKey: ["rrg", "rankings", "cross-asset", timeframe],
+    queryFn: () => fetchCrossAssetRankings({ timeframe }),
     staleTime: 5 * 60 * 1000,
   });
 }

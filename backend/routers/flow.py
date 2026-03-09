@@ -8,14 +8,17 @@ from backend.models.schemas import (
     OBVScoreHistoryEntry,
     OBVStructureEntry,
 )
-from backend.services.obv import get_obv_detail, get_obv_score_history, get_obv_structure
+from backend.services.flow import get_obv_detail, get_obv_score_history, get_obv_structure
 
 router = APIRouter()
 
 
 @router.get("/structure", response_model=list[OBVStructureEntry])
-def obv_structure(conn=Depends(get_db)):
-    return get_obv_structure(conn)
+def obv_structure(
+    timeframe: str = Query("daily", pattern="^(daily|4h|weekly)$"),
+    conn=Depends(get_db),
+):
+    return get_obv_structure(conn, timeframe=timeframe)
 
 
 @router.get("/score-history", response_model=list[OBVScoreHistoryEntry])
@@ -32,10 +35,11 @@ def obv_score_history(
 def obv_detail(
     symbol: str,
     lookback: int = Query(252, ge=21, le=1260, description="Bars of detail data"),
+    timeframe: str = Query("daily", pattern="^(daily|4h|weekly)$"),
     conn=Depends(get_db),
 ):
     symbol = symbol.upper()
-    result = get_obv_detail(conn, symbol=symbol, lookback_bars=lookback)
+    result = get_obv_detail(conn, symbol=symbol, lookback_bars=lookback, timeframe=timeframe)
     if result is None:
         raise HTTPException(status_code=404, detail=f"Symbol '{symbol}' not found in OBV universe")
     return result

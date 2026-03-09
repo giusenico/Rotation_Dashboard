@@ -3,11 +3,12 @@ import { ThemeToggle } from "./ThemeToggle";
 
 const pageTitles: Record<string, string> = {
   "/": "Dashboard",
+  "/rrg": "Relative Rotation (RRG)",
   "/rrg/sectors": "Sector Rotation (RRG)",
   "/rrg/cross-asset": "Cross-Asset Rotation (RRG)",
   "/prices": "Price Explorer",
-  "/rankings": "Rankings",
-  "/obv": "OBV Structure",
+  "/obv": "Capital Flow Structure",
+  "/regime": "Market Regime",
 };
 
 export function Header() {

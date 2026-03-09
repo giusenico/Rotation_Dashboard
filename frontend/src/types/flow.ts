@@ -40,6 +40,7 @@ export interface OBVDetailResponse {
   symbol: string;
   asset: string;
   obv_regime: "buy" | "sell";
+  last_price: number | null;
   rotation_score: number | null;
   spread_percentile: number | null;
   spread_momentum_z: number | null;

@@ -97,7 +97,7 @@ TICKER_CATEGORY_MAP: dict[str, str] = {}
 for sym in SECTOR_ETFS:
     TICKER_CATEGORY_MAP[sym] = "Sector ETF"
 
-for sym, label in CROSS_ASSET_ETFS.items():
+for sym in CROSS_ASSET_ETFS:
     if sym in ("BND", "SHY", "SHV", "IEF", "TLT"):
         TICKER_CATEGORY_MAP[sym] = "Bond ETF"
     elif sym in ("GLD", "SLV", "USO", "BNO"):

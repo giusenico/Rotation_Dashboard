@@ -1,10 +1,11 @@
 import { useQuery } from "@tanstack/react-query";
-import { fetchOBVDetail, fetchOBVScoreHistory, fetchOBVStructure } from "../api/obv";
+import { fetchOBVDetail, fetchOBVScoreHistory, fetchOBVStructure } from "../api/flow";
+import type { OBVTimeframe } from "../api/flow";
 
-export function useOBVStructure() {
+export function useOBVStructure(timeframe: OBVTimeframe = "daily") {
   return useQuery({
-    queryKey: ["obv", "structure"],
-    queryFn: fetchOBVStructure,
+    queryKey: ["obv", "structure", timeframe],
+    queryFn: () => fetchOBVStructure(timeframe),
     staleTime: 5 * 60 * 1000,
     gcTime: 30 * 60 * 1000,
   });
@@ -19,10 +20,10 @@ export function useOBVScoreHistory(symbols?: string[], lookback = 252) {
   });
 }
 
-export function useOBVDetail(symbol: string | null, lookback = 252) {
+export function useOBVDetail(symbol: string | null, lookback = 252, timeframe: OBVTimeframe = "daily") {
   return useQuery({
-    queryKey: ["obv", "detail", symbol, lookback],
-    queryFn: () => fetchOBVDetail(symbol!, lookback),
+    queryKey: ["obv", "detail", symbol, lookback, timeframe],
+    queryFn: () => fetchOBVDetail(symbol!, lookback, timeframe),
     enabled: symbol !== null,
     staleTime: 5 * 60 * 1000,
     gcTime: 30 * 60 * 1000,
