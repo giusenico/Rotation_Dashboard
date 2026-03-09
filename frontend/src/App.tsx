@@ -27,7 +27,7 @@ const router = createBrowserRouter([
       { path: "rrg/sectors", element: <RRGPage /> },
       { path: "rrg/cross-asset", element: <RRGPage /> },
       { path: "prices", element: <PriceExplorerPage /> },
-{ path: "obv", element: <FlowStructurePage /> },
+{ path: "capital-flow", element: <FlowStructurePage /> },
       { path: "regime", element: <MarketRegimePage /> },
       { path: "*", element: <NotFoundPage /> },
     ],

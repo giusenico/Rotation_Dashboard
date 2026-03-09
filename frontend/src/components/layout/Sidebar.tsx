@@ -23,7 +23,7 @@ const navGroups = [
   {
     label: "Flow",
     items: [
-      { to: "/obv", label: "Capital Flow Structure", icon: BarChart3 },
+      { to: "/capital-flow", label: "Capital Flow Structure", icon: BarChart3 },
     ],
   },
   {
