@@ -7,7 +7,7 @@ const pageTitles: Record<string, string> = {
   "/rrg/sectors": "Sector Rotation (RRG)",
   "/rrg/cross-asset": "Cross-Asset Rotation (RRG)",
   "/prices": "Price Explorer",
-  "/obv": "Capital Flow Structure",
+  "/capital-flow": "Capital Flow Structure",
   "/regime": "Market Regime",
 };
 

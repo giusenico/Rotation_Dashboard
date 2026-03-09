@@ -179,7 +179,7 @@ function FlowLeaders({ data }: { data: OBVStructureEntry[] }) {
           <Activity size={16} style={{ display: "inline", marginRight: 6, verticalAlign: "middle" }} />
           Capital Flow Leaders
         </h2>
-        <Link to="/obv" className="view-full-link">View Details &rarr;</Link>
+        <Link to="/capital-flow" className="view-full-link">View Details &rarr;</Link>
       </div>
       <div className="obv-preview-cols">
         <div className="obv-preview-col">
