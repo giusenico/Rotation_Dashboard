@@ -9,6 +9,15 @@ import {
 import { fetchTickers } from "../api/tickers";
 import type { TickerInfo } from "../types/prices";
 
+type TickerCategoryMap = Record<string, string[]>;
+
+type TickerGroups = {
+  sectors: string[];
+  crossAsset: string[];
+  all: string[];
+  byCategory: TickerCategoryMap;
+};
+
 export function usePerformance(symbols = "all") {
   return useQuery({
     queryKey: ["performance", symbols],
@@ -58,12 +67,24 @@ export function useTickers() {
     queryFn: () => fetchTickers(),
     staleTime: 30 * 60 * 1000,
     select: (data: TickerInfo[]) => {
+      const byCategory: TickerCategoryMap = {};
       const sectors = data.filter((t) => t.category === "Sector ETF").map((t) => t.symbol);
       const crossAsset = data
         .filter((t) => t.category !== "Sector ETF" && t.category !== "Benchmark")
         .map((t) => t.symbol);
+      for (const ticker of data) {
+        byCategory[ticker.category] = [...(byCategory[ticker.category] ?? []), ticker.symbol];
+      }
+      for (const key of Object.keys(byCategory)) {
+        byCategory[key] = [...new Set(byCategory[key])].sort();
+      }
       const all = [...sectors, ...crossAsset];
-      return { sectors, crossAsset, all };
+      return {
+        sectors,
+        crossAsset,
+        all,
+        byCategory,
+      } as TickerGroups;
     },
   });
 }

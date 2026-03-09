@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Compute today's OBV daily metrics for all CROSS_ASSET_ETFS and upsert them
+Compute today's OBV daily metrics for all flow-backed tickers and upsert them
 into the obv_daily_metrics table.
 
 Intended to run right after fetch_data.py in the daily GitHub Actions workflow.
@@ -19,7 +19,7 @@ import psycopg2
 from scipy.stats import rankdata
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from config import CROSS_ASSET_ETFS, SUPABASE_DB_URL
+from config import CROSS_ASSET_ETFS, SECTOR_ETFS, SUPABASE_DB_URL
 
 # Constants (must match backend/services/flow.py)
 OBV_SMA_LEN = 50
@@ -51,7 +51,7 @@ def main() -> None:
 
     today_str = date.today().isoformat()
 
-    symbols = list(CROSS_ASSET_ETFS.keys())
+    symbols = list({**CROSS_ASSET_ETFS, **SECTOR_ETFS}.keys())
     placeholders = ",".join(["%s"] * len(symbols))
 
     with conn.cursor() as cur:

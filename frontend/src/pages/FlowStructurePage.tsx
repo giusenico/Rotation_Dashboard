@@ -5,6 +5,7 @@ import { LoadingSpinner } from "../components/common/LoadingSpinner";
 import { CompareBar } from "../components/common/CompareBar";
 import { FlowCompareModal } from "../components/charts/FlowCompareModal";
 import { useCompare } from "../hooks/useCompare";
+import { useTickers } from "../hooks/usePriceData";
 import { formatPct, formatNum } from "../utils/formatters";
 import type { OBVStructureEntry } from "../types/flow";
 import type { OBVTimeframe } from "../api/flow";
@@ -13,15 +14,7 @@ import { getTickerColor } from "../utils/colors";
 import { cssVar } from "../utils/cssVar";
 import { FlowGlossary } from "../components/charts/FlowGlossary";
 import type { OBVSection } from "../components/charts/FlowGlossary";
-
-// ── Category mapping ─────────────────────────────────────────────────
-const CATEGORIES: Record<string, string[]> = {
-  Sectors: ["XLF", "XLV", "XLY", "XLC", "XLE", "XLI", "XLK", "XLU", "XLB", "XLRE", "XLP"],
-  Bonds: ["BND", "SHY", "SHV", "IEF", "TLT"],
-  Equities: ["SPYV", "SPEU", "EEMA", "ILF", "QQQ", "EWJ", "IWM", "SPYG"],
-  Commodities: ["GLD", "SLV", "USO", "BNO"],
-  Crypto: ["IBIT"],
-};
+import { buildDisplayCategoryBuckets } from "../utils/tickerCategories";
 
 // ── Timeframe-aware lookback options ────────────────────────────────
 const LOOKBACK_BY_TF: Record<OBVTimeframe, { label: string; value: number }[]> = {
@@ -396,13 +389,18 @@ export function FlowStructurePage() {
   const [showCompare, setShowCompare] = useState(false);
   const compare = useCompare();
   const [tooltip, setTooltip] = useState<{ text: string; x: number; y: number } | null>(null);
-  const [activeCategories, setActiveCategories] = useState<Set<string>>(
-    new Set(Object.keys(CATEGORIES))
-  );
+  const { data: tickers } = useTickers();
+  const categories = useMemo(() => buildDisplayCategoryBuckets(tickers?.byCategory), [tickers?.byCategory]);
+  const categoryKeys = useMemo(() => Object.keys(categories), [categories]);
+  const [activeCategories, setActiveCategories] = useState<Set<string>>(new Set());
   const [sortKey, setSortKey] = useState<SortKey>("score");
   const [sortAsc, setSortAsc] = useState(false);
 
   const [activeSection, forceSection] = useActiveSection(SECTION_IDS);
+
+  useEffect(() => {
+    setActiveCategories((prev) => (prev.size === 0 ? new Set(categoryKeys) : prev));
+  }, [categoryKeys, setActiveCategories]);
 
   // Compute deltas from recent score history
   const deltas = useMemo(() => {
@@ -435,8 +433,10 @@ export function FlowStructurePage() {
   // Filter by active categories
   const filteredData = useMemo(() => {
     if (!data) return [];
+    if (categoryKeys.length === 0) return data;
+
     const allowedSymbols = new Set(
-      Object.entries(CATEGORIES)
+      Object.entries(categories)
         .filter(([cat]) => activeCategories.has(cat))
         .flatMap(([, syms]) => syms)
     );
@@ -509,8 +509,8 @@ export function FlowStructurePage() {
 
           {/* Category filter chips */}
           <div className="category-chips" style={{ marginBottom: 16 }}>
-            {Object.entries(CATEGORIES).map(([cat, syms]) => {
-              const count = data.filter((e) => syms.includes(e.symbol)).length;
+            {Object.entries(categories).map(([cat]) => {
+              const count = data.filter((e) => categories[cat]?.includes(e.symbol)).length;
               return (
                 <button
                   key={cat}

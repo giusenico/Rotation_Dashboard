@@ -5,6 +5,7 @@ import { LoadingSpinner } from "../components/common/LoadingSpinner";
 import { CompareBar } from "../components/common/CompareBar";
 import { RegimeCompareModal } from "../components/charts/RegimeCompareModal";
 import { useCompare } from "../hooks/useCompare";
+import { useTickers } from "../hooks/usePriceData";
 import type { RegimeSummaryEntry } from "../types/regime";
 import type { RegimeTimeframe, OverextMode } from "../api/regime";
 import { TrendingUp, TrendingDown, Minus, X } from "lucide-react";
@@ -12,16 +13,9 @@ import { getTickerColor } from "../utils/colors";
 import { cssVar } from "../utils/cssVar";
 import { RegimeGlossary } from "../components/charts/RegimeGlossary";
 import type { RegimeSection } from "../components/charts/RegimeGlossary";
+import { buildDisplayCategoryBuckets } from "../utils/tickerCategories";
 
 // ── Constants ───────────────────────────────────────────────────────
-
-const CATEGORIES: Record<string, string[]> = {
-  Sectors: ["XLF", "XLV", "XLY", "XLC", "XLE", "XLI", "XLK", "XLU", "XLB", "XLRE", "XLP"],
-  Bonds: ["BND", "SHY", "SHV", "IEF", "TLT"],
-  Equities: ["SPYV", "SPEU", "EEMA", "ILF", "QQQ", "EWJ", "IWM", "SPYG"],
-  Commodities: ["GLD", "SLV", "USO", "BNO"],
-  Crypto: ["IBIT"],
-};
 
 const TIMEFRAME_OPTIONS: { label: string; value: RegimeTimeframe }[] = [
   { label: "4H", value: "4h" },
@@ -441,15 +435,22 @@ export function MarketRegimePage() {
   const [timeframe, setTimeframe] = useState<RegimeTimeframe>("weekly");
   const [overextMode, setOverextMode] = useState<OverextMode>("Z");
   const { data, isLoading, error } = useRegimeSummary(timeframe, overextMode);
+  const { data: tickers } = useTickers();
+  const categories = useMemo(() => buildDisplayCategoryBuckets(tickers?.byCategory), [tickers?.byCategory]);
+  const categoryKeys = useMemo(() => Object.keys(categories), [categories]);
   const [selectedSymbol, setSelectedSymbol] = useState<string | null>(null);
   const [showCompare, setShowCompare] = useState(false);
   const compare = useCompare();
   const [tooltip, setTooltip] = useState<{ text: string; x: number; y: number } | null>(null);
-  const [activeCategories, setActiveCategories] = useState<Set<string>>(new Set(Object.keys(CATEGORIES)));
+  const [activeCategories, setActiveCategories] = useState<Set<string>>(new Set());
   const [sortKey, setSortKey] = useState<SortKey>("regime");
   const [sortAsc, setSortAsc] = useState(false);
   // Glossary scroll tracking (matches RRG/OBV pattern)
   const [glossarySection, setGlossarySection] = useState<RegimeSection>("overview");
+
+  useEffect(() => {
+    setActiveCategories((prev) => (prev.size === 0 ? new Set(categoryKeys) : prev));
+  }, [categoryKeys]);
   const overrideRef = useRef<RegimeSection | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
@@ -512,8 +513,10 @@ export function MarketRegimePage() {
 
   const filteredData = useMemo(() => {
     if (!data) return [];
+    if (categoryKeys.length === 0) return data;
+
     const allowedSymbols = new Set(
-      Object.entries(CATEGORIES)
+      Object.entries(categories)
         .filter(([cat]) => activeCategories.has(cat))
         .flatMap(([, syms]) => syms),
     );
@@ -601,8 +604,8 @@ export function MarketRegimePage() {
 
           {/* Category filter chips */}
           <div className="category-chips" style={{ marginBottom: 16 }}>
-            {Object.entries(CATEGORIES).map(([cat, syms]) => {
-              const count = data.filter((e) => syms.includes(e.symbol)).length;
+            {Object.entries(categories).map(([cat]) => {
+              const count = data.filter((e) => categories[cat]?.includes(e.symbol)).length;
               return (
                 <button
                   key={cat}

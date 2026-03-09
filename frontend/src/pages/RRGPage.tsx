@@ -6,6 +6,7 @@ import {
   useSectorRankings,
   useCrossAssetRankings,
 } from "../hooks/useRRGData";
+import { useTickers } from "../hooks/usePriceData";
 import { RRGChart } from "../components/charts/RRGChart";
 import { RRGGlossary } from "../components/charts/RRGGlossary";
 import type { RRGSection } from "../components/charts/RRGGlossary";
@@ -13,16 +14,9 @@ import { getTickerColor } from "../utils/colors";
 import { formatNum } from "../utils/formatters";
 import { assignQuadrant, spanToHuman } from "../utils/rrg";
 import type { RRGPoint } from "../types/rrg";
+import { buildDisplayCategoryBuckets } from "../utils/tickerCategories";
 
 type Tab = "sectors" | "cross-asset";
-
-// Cross-asset category groupings for filter chips
-const CROSS_ASSET_CATEGORIES: Record<string, string[]> = {
-  Bonds: ["BND", "SHY", "SHV", "IEF", "TLT"],
-  Equities: ["SPYV", "SPEU", "EEMA", "ILF", "QQQ", "EWJ", "IWM", "SPYG"],
-  Commodities: ["GLD", "SLV", "USO", "BNO"],
-  Crypto: ["IBIT"],
-};
 
 interface QuadrantCounts {
   Leading: string[];
@@ -110,11 +104,16 @@ export function RRGPage() {
   const [momentumSpan, setMomentumSpan] = useState(10);
   const [timeframe, setTimeframe] = useState("weekly");
   const [focusTicker, setFocusTicker] = useState<string | null>(null);
-  const [activeCategories, setActiveCategories] = useState<Set<string>>(
-    new Set(Object.keys(CROSS_ASSET_CATEGORIES))
-  );
+  const { data: tickers } = useTickers();
+  const crossAssetCategories = useMemo(() => buildDisplayCategoryBuckets(tickers?.byCategory, false), [tickers?.byCategory]);
+  const crossAssetCategoryKeys = useMemo(() => Object.keys(crossAssetCategories), [crossAssetCategories]);
+  const [activeCategories, setActiveCategories] = useState<Set<string>>(new Set());
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [activeSection, forceSection] = useActiveSection(RRG_SECTION_IDS);
+
+  useEffect(() => {
+    setActiveCategories((prev) => (prev.size === 0 ? new Set(crossAssetCategoryKeys) : prev));
+  }, [crossAssetCategoryKeys]);
 
   const params = { trail_length: trailLength, rs_span: rsSpan, momentum_span: momentumSpan, timeframe };
 
@@ -131,8 +130,9 @@ export function RRGPage() {
   const visibleTickers = useMemo(() => {
     if (!rrg) return [];
     if (tab === "cross-asset") {
+      if (crossAssetCategoryKeys.length === 0) return rrg.tickers;
       const allowedByCategory = new Set(
-        Object.entries(CROSS_ASSET_CATEGORIES)
+        Object.entries(crossAssetCategories)
           .filter(([cat]) => activeCategories.has(cat))
           .flatMap(([, syms]) => syms)
       );
@@ -344,7 +344,7 @@ export function RRGPage() {
       {/* Category filter chips (cross-asset only) */}
       {tab === "cross-asset" && (
         <div className="category-chips" style={{ marginBottom: 16 }}>
-          {Object.keys(CROSS_ASSET_CATEGORIES).map((cat) => (
+          {crossAssetCategoryKeys.map((cat) => (
             <button
               key={cat}
               className={`cat-chip ${activeCategories.has(cat) ? "cat-chip--active" : ""}`}
@@ -352,7 +352,7 @@ export function RRGPage() {
             >
               {cat}
               <span className="cat-chip-count">
-                {CROSS_ASSET_CATEGORIES[cat].length}
+                {crossAssetCategories[cat]?.length ?? 0}
               </span>
             </button>
           ))}

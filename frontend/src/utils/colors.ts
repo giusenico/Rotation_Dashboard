@@ -31,6 +31,7 @@ export const TICKER_COLORS: Record<string, string> = {
   SHV: "#B8D4E3",
   USO: "#D4A574",
   BNO: "#C68B59",
+  "^GSPC": "#A8DADC",
 };
 
 /** Fallback color for unknown tickers. */
