@@ -201,3 +201,51 @@ class RegimeDetailResponse(BaseModel):
     regime_series: list[RegimeTimePoint]
     overext_series: list[RegimeTimePoint]
     flow_series: list[RegimeTimePoint]
+
+
+# ── Volatility ──────────────────────────────────────────────────────
+
+class VolatilitySummary(BaseModel):
+    vix_last: float | None = None
+    vix3m_last: float | None = None
+    sp500_last: float | None = None
+    vix_ratio: float | None = None
+    ratio_ma50: float | None = None
+    vix_oscillator: float | None = None
+    ratio_oscillator: float | None = None
+    signal: str  # "buy" | "sell" | "caution" | "neutral"
+    position: str  # "invested" | "cash"
+    as_of_date: str
+
+
+class VolatilityPricePoint(BaseModel):
+    date: str
+    vix: float | None = None
+    vix3m: float | None = None
+
+
+class VolatilityOscPoint(BaseModel):
+    date: str
+    vix_osc: float | None = None
+    ratio_osc: float | None = None
+
+
+class VolatilityRatioPoint(BaseModel):
+    date: str
+    ratio: float | None = None
+    ratio_ma50: float | None = None
+
+
+class BacktestPoint(BaseModel):
+    date: str
+    strategy: float | None = None
+    benchmark: float | None = None
+    position: int = 0
+
+
+class VolatilityDetailResponse(BaseModel):
+    summary: VolatilitySummary
+    vix_series: list[VolatilityPricePoint]
+    oscillator_series: list[VolatilityOscPoint]
+    ratio_series: list[VolatilityRatioPoint]
+    backtest_series: list[BacktestPoint]

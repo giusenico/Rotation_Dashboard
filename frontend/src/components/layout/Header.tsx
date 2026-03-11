@@ -9,6 +9,7 @@ const pageTitles: Record<string, string> = {
   "/prices": "Price Explorer",
   "/capital-flow": "Capital Flow Structure",
   "/regime": "Market Regime",
+  "/volatility": "VIX Structure",
 };
 
 export function Header() {

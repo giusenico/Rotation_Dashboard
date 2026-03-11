@@ -6,6 +6,7 @@ import { RRGPage } from "./pages/RRGPage";
 import { PriceExplorerPage } from "./pages/PriceExplorerPage";
 import { FlowStructurePage } from "./pages/FlowStructurePage";
 import { MarketRegimePage } from "./pages/MarketRegimePage";
+import { VolatilityPage } from "./pages/VolatilityPage";
 
 function NotFoundPage() {
   return (
@@ -29,6 +30,7 @@ const router = createBrowserRouter([
       { path: "prices", element: <PriceExplorerPage /> },
 { path: "capital-flow", element: <FlowStructurePage /> },
       { path: "regime", element: <MarketRegimePage /> },
+      { path: "volatility", element: <VolatilityPage /> },
       { path: "*", element: <NotFoundPage /> },
     ],
   },

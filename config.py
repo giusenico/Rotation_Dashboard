@@ -41,6 +41,7 @@ CATEGORIES = {
     "Commodity ETF": 4,
     "Crypto ETF": 5,
     "Benchmark": 6,
+    "Volatility Index": 7,
 }
 
 # ---------------------------------------------------------------------------
@@ -90,6 +91,14 @@ CROSS_ASSET_ETFS = {
 BENCHMARK = {"^GSPC": "S&P 500"}
 
 # ---------------------------------------------------------------------------
+# Volatility indices — VIX term structure (no volume data)
+# ---------------------------------------------------------------------------
+VOLATILITY_INDICES = {
+    "^VIX": "CBOE Volatility Index (VIX)",
+    "^VIX3M": "CBOE 3-Month Volatility Index",
+}
+
+# ---------------------------------------------------------------------------
 # Mapping: symbol -> category name (used by init_db to seed tickers)
 # ---------------------------------------------------------------------------
 TICKER_CATEGORY_MAP: dict[str, str] = {}
@@ -110,7 +119,10 @@ for sym in CROSS_ASSET_ETFS:
 for sym in BENCHMARK:
     TICKER_CATEGORY_MAP[sym] = "Benchmark"
 
+for sym in VOLATILITY_INDICES:
+    TICKER_CATEGORY_MAP[sym] = "Volatility Index"
+
 # ---------------------------------------------------------------------------
 # Convenience: all tickers in a single dict  symbol -> human-readable name
 # ---------------------------------------------------------------------------
-ALL_TICKERS: dict[str, str] = {**SECTOR_ETFS, **CROSS_ASSET_ETFS, **BENCHMARK}
+ALL_TICKERS: dict[str, str] = {**SECTOR_ETFS, **CROSS_ASSET_ETFS, **BENCHMARK, **VOLATILITY_INDICES}

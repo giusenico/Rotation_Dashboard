@@ -6,6 +6,7 @@ import {
   LineChart,
   BarChart3,
   Gauge,
+  Activity,
 } from "lucide-react";
 
 const navGroups = [
@@ -30,6 +31,12 @@ const navGroups = [
     label: "Momentum",
     items: [
       { to: "/regime", label: "Market Regime", icon: Gauge },
+    ],
+  },
+  {
+    label: "Volatility",
+    items: [
+      { to: "/volatility", label: "VIX Structure", icon: Activity },
     ],
   },
   {

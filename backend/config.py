@@ -15,6 +15,7 @@ from config import (  # noqa: E402
     SECTOR_ETFS,
     CROSS_ASSET_ETFS,
     BENCHMARK,
+    VOLATILITY_INDICES,
     ALL_TICKERS,
     CATEGORIES,
     TICKER_CATEGORY_MAP,
