@@ -242,7 +242,7 @@ def get_volatility_detail(
         return empty_result
 
     tail = combined.tail(lookback_bars)
-    bt = _compute_backtest(combined)
+    bt = _compute_backtest(tail)
     fmt = "%Y-%m-%d"
 
     vix_series = [
