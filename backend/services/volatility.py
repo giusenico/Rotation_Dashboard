@@ -241,8 +241,8 @@ def get_volatility_detail(
     if combined is None or combined.empty:
         return empty_result
 
-    bt = _compute_backtest(combined)
     tail = combined.tail(lookback_bars)
+    bt = _compute_backtest(tail)
     fmt = "%Y-%m-%d"
 
     vix_series = [
@@ -270,13 +270,12 @@ def get_volatility_detail(
 
     backtest_series = []
     if not bt.empty:
-        bt_tail = bt.tail(lookback_bars)
         backtest_series = [
             {"date": idx.strftime(fmt),
              "strategy": _safe_float(row["strategy_cum"], 4),
              "benchmark": _safe_float(row["sp500_cum"], 4),
              "position": int(row["position"])}
-            for idx, row in bt_tail.iterrows()
+            for idx, row in bt.iterrows()
             if pd.notna(row.get("strategy_cum"))
         ]
 
