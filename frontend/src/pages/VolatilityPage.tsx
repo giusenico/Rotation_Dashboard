@@ -10,10 +10,10 @@ import { Gauge, ShieldAlert, Activity, Zap } from "lucide-react";
 // ── Constants ───────────────────────────────────────────────────────
 
 const LOOKBACK_OPTIONS = [
-  { label: "1Y", value: 252 },
   { label: "2Y", value: 500 },
   { label: "3Y", value: 756 },
-  { label: "All", value: 1260 },
+  { label: "5Y", value: 1260 },
+  { label: "All", value: 2520 },
 ];
 
 const WINDOW_OPTIONS = [
@@ -264,7 +264,7 @@ const GLOSSARY_SCROLL_MAP: Record<VolSection, string> = {
 };
 
 export function VolatilityPage() {
-  const [lookback, setLookback] = useState(500);
+  const [lookback, setLookback] = useState(1260);
   const [window, setWindow] = useState(252);
   const { data, isLoading, error } = useVolatilityDetail(lookback, window);
   const c = useChartColors();

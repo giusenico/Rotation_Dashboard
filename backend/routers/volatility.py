@@ -25,7 +25,7 @@ def volatility_summary(
 
 @router.get("/detail", response_model=VolatilityDetailResponse)
 def volatility_detail(
-    lookback: int = Query(500, ge=63, le=1260),
+    lookback: int = Query(1260, ge=63, le=2520),
     window: int = Query(252, ge=63, le=504),
     conn=Depends(get_db),
 ):
