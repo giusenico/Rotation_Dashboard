@@ -14,16 +14,25 @@ const LOOKBACK_BY_TF: Record<OBVTimeframe, { label: string; value: number }[]> =
     { label: "3M", value: 63 },
     { label: "6M", value: 126 },
     { label: "1Y", value: 252 },
+    { label: "2Y", value: 504 },
+    { label: "5Y", value: 1260 },
+    { label: "All", value: 9999 },
   ],
   "4h": [
     { label: "3M", value: 126 },
     { label: "6M", value: 252 },
     { label: "1Y", value: 504 },
+    { label: "2Y", value: 1008 },
+    { label: "5Y", value: 2520 },
+    { label: "All", value: 9999 },
   ],
   weekly: [
     { label: "3M", value: 13 },
     { label: "6M", value: 26 },
     { label: "1Y", value: 52 },
+    { label: "2Y", value: 104 },
+    { label: "5Y", value: 260 },
+    { label: "All", value: 9999 },
   ],
 };
 
@@ -59,7 +68,8 @@ interface Props {
 
 export function FlowCompareModal({ symbols, timeframe, onClose }: Props) {
   const currentOptions = LOOKBACK_BY_TF[timeframe];
-  const [lookback, setLookback] = useState(currentOptions[currentOptions.length - 1].value);
+  const defaultLookback = (currentOptions.find(o => o.label === "5Y") ?? currentOptions[currentOptions.length - 1]).value;
+  const [lookback, setLookback] = useState(defaultLookback);
   const { results, isLoading } = useMultiOBVDetail(symbols, lookback, timeframe);
 
   const bgColor = "rgba(0,0,0,0)";

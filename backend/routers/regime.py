@@ -21,7 +21,7 @@ def regime_summary(
 @router.get("/detail/{symbol}", response_model=RegimeDetailResponse)
 def regime_detail(
     symbol: str,
-    lookback: int = Query(252, ge=21, le=1260),
+    lookback: int = Query(252, ge=21, le=9999),
     timeframe: str = Query("daily", pattern="^(daily|4h|weekly)$"),
     overext_mode: str = Query("Z", pattern="^(Z|pct|ATR)$"),
     conn=Depends(get_db),

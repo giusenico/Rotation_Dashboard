@@ -24,7 +24,7 @@ def obv_structure(
 @router.get("/score-history", response_model=list[OBVScoreHistoryEntry])
 def obv_score_history(
     symbols: str | None = Query(None, description="Comma-separated list of symbols"),
-    lookback: int = Query(252, ge=21, le=1260, description="Trading days of history"),
+    lookback: int = Query(252, ge=21, le=9999, description="Trading days of history"),
     conn=Depends(get_db),
 ):
     sym_list = [s.strip().upper() for s in symbols.split(",")] if symbols else None
@@ -34,7 +34,7 @@ def obv_score_history(
 @router.get("/detail/{symbol}", response_model=OBVDetailResponse)
 def obv_detail(
     symbol: str,
-    lookback: int = Query(252, ge=21, le=1260, description="Bars of detail data"),
+    lookback: int = Query(252, ge=21, le=9999, description="Bars of detail data"),
     timeframe: str = Query("daily", pattern="^(daily|4h|weekly)$"),
     conn=Depends(get_db),
 ):
