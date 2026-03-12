@@ -213,7 +213,7 @@ export function RegimeCompareModal({ symbols, timeframe, overextMode, onClose }:
                 layout={{
                   paper_bgcolor: bgColor, plot_bgcolor: bgColor, height: 220,
                   margin: { l: 55, r: 16, t: 10, b: 30 },
-                  xaxis: { gridcolor: gridColor, color: textColor, tickfont: { color: textColor, size: 10 }, showticklabels: false },
+                  xaxis: { type: "date", tickformat: "%b '%y", gridcolor: gridColor, color: textColor, tickfont: { color: textColor, size: 10 } },
                   yaxis: { gridcolor: gridColor, color: textColor, tickfont: { color: textColor, size: 10 }, title: { text: "Normalized", font: { color: textColor, size: 10 } } },
                   shapes: regimeShapeSets[0] as Plotly.Shape[],
                   legend: { orientation: "h", y: 1.12, x: 0.5, xanchor: "center", font: { color: textColor, size: 11 } },
@@ -241,7 +241,7 @@ export function RegimeCompareModal({ symbols, timeframe, overextMode, onClose }:
                   layout={{
                     paper_bgcolor: bgColor, plot_bgcolor: bgColor, height: 200,
                     margin: { l: 55, r: 16, t: 10, b: 30 },
-                    xaxis: { gridcolor: gridColor, color: textColor, tickfont: { color: textColor, size: 10 }, showticklabels: false },
+                    xaxis: { type: "date", tickformat: "%b '%y", gridcolor: gridColor, color: textColor, tickfont: { color: textColor, size: 10 } },
                     yaxis: { gridcolor: gridColor, color: textColor, tickfont: { color: textColor, size: 10 }, zeroline: true, zerolinecolor: gridColor, title: { text: overextMode, font: { color: textColor, size: 10 } } },
                     shapes: [
                       { type: "line", x0: 0, x1: 1, xref: "paper", y0: results[0].overext_threshold, y1: results[0].overext_threshold, line: { color: greenColor, width: 1, dash: "dash" } },
@@ -273,7 +273,7 @@ export function RegimeCompareModal({ symbols, timeframe, overextMode, onClose }:
                   layout={{
                     paper_bgcolor: bgColor, plot_bgcolor: bgColor, height: 200,
                     margin: { l: 55, r: 16, t: 10, b: 40 },
-                    xaxis: { gridcolor: gridColor, color: textColor, tickfont: { color: textColor, size: 10 } },
+                    xaxis: { type: "date", tickformat: "%b '%y", gridcolor: gridColor, color: textColor, tickfont: { color: textColor, size: 10 } },
                     yaxis: { gridcolor: gridColor, color: textColor, tickfont: { color: textColor, size: 10 }, zeroline: true, zerolinecolor: gridColor, title: { text: "Z-Score", font: { color: textColor, size: 10 } } },
                     shapes: [
                       { type: "line", x0: 0, x1: 1, xref: "paper", y0: results[0].flow_threshold, y1: results[0].flow_threshold, line: { color: greenColor, width: 1, dash: "dash" } },

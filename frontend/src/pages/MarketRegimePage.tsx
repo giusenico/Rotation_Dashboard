@@ -328,7 +328,7 @@ function DetailModal({
                   plot_bgcolor: bgColor,
                   height: 240,
                   margin: { l: 55, r: 16, t: 10, b: 30 },
-                  xaxis: { gridcolor: gridColor, color: textColor, tickfont: { color: textColor, size: 10 }, showticklabels: false },
+                  xaxis: { type: "date", tickformat: "%b '%y", gridcolor: gridColor, color: textColor, tickfont: { color: textColor, size: 10 } },
                   yaxis: { gridcolor: gridColor, color: textColor, tickfont: { color: textColor, size: 10 }, title: { text: "Price", font: { color: textColor, size: 10 } } },
                   shapes: regimeShapes as Plotly.Shape[],
                   showlegend: true,
@@ -363,7 +363,7 @@ function DetailModal({
                     plot_bgcolor: bgColor,
                     height: 180,
                     margin: { l: 55, r: 16, t: 10, b: 30 },
-                    xaxis: { gridcolor: gridColor, color: textColor, tickfont: { color: textColor, size: 10 }, showticklabels: false },
+                    xaxis: { type: "date", tickformat: "%b '%y", gridcolor: gridColor, color: textColor, tickfont: { color: textColor, size: 10 } },
                     yaxis: { gridcolor: gridColor, color: textColor, tickfont: { color: textColor, size: 10 }, zeroline: true, zerolinecolor: gridColor, title: { text: overextMode, font: { color: textColor, size: 10 } } },
                     shapes: [
                       { type: "line", x0: 0, x1: 1, xref: "paper", y0: data.overext_threshold, y1: data.overext_threshold, line: { color: greenColor, width: 1, dash: "dash" } },
@@ -403,7 +403,7 @@ function DetailModal({
                     plot_bgcolor: bgColor,
                     height: 180,
                     margin: { l: 55, r: 16, t: 10, b: 40 },
-                    xaxis: { gridcolor: gridColor, color: textColor, tickfont: { color: textColor, size: 10 } },
+                    xaxis: { type: "date", tickformat: "%b '%y", gridcolor: gridColor, color: textColor, tickfont: { color: textColor, size: 10 } },
                     yaxis: { gridcolor: gridColor, color: textColor, tickfont: { color: textColor, size: 10 }, zeroline: true, zerolinecolor: gridColor, title: { text: "Z-Score", font: { color: textColor, size: 10 } } },
                     shapes: [
                       { type: "line", x0: 0, x1: 1, xref: "paper", y0: data.flow_threshold, y1: data.flow_threshold, line: { color: greenColor, width: 1, dash: "dash" } },

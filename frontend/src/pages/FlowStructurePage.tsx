@@ -248,7 +248,7 @@ function DetailModal({ symbol, onClose, timeframe }: { symbol: string; onClose: 
                 layout={{
                   paper_bgcolor: bgColor, plot_bgcolor: bgColor, height: 220,
                   margin: { l: 55, r: 16, t: 10, b: 40 },
-                  xaxis: { gridcolor: gridColor, color: textColor, tickfont: { color: textColor, size: 10 } },
+                  xaxis: { type: "date", tickformat: "%b '%y", gridcolor: gridColor, color: textColor, tickfont: { color: textColor, size: 10 } },
                   yaxis: { gridcolor: gridColor, color: textColor, tickfont: { color: textColor, size: 10 }, zeroline: true, zerolinecolor: zeroLine, title: { text: "Spread", font: { color: textColor, size: 10 } } },
                   bargap: 0.05,
                 }}
@@ -279,7 +279,7 @@ function DetailModal({ symbol, onClose, timeframe }: { symbol: string; onClose: 
                   layout={{
                     paper_bgcolor: bgColor, plot_bgcolor: bgColor, height: 200,
                     margin: { l: 55, r: 16, t: 10, b: 40 },
-                    xaxis: { gridcolor: gridColor, color: textColor, tickfont: { color: textColor, size: 10 } },
+                    xaxis: { type: "date", tickformat: "%b '%y", gridcolor: gridColor, color: textColor, tickfont: { color: textColor, size: 10 } },
                     yaxis: { gridcolor: gridColor, color: textColor, tickfont: { color: textColor, size: 10 }, zeroline: true, zerolinecolor: zeroLine, range: [-1.05, 1.05], title: { text: "Score", font: { color: textColor, size: 10 } } },
                     shapes: [
                       { type: "rect", x0: 0, x1: 1, xref: "paper", y0: 0, y1: 1.05, fillcolor: cssVar("--positive-fill"), line: { width: 0 }, layer: "below" },
@@ -309,7 +309,7 @@ function DetailModal({ symbol, onClose, timeframe }: { symbol: string; onClose: 
                 layout={{
                   paper_bgcolor: bgColor, plot_bgcolor: bgColor, height: 180,
                   margin: { l: 55, r: 16, t: 10, b: 40 },
-                  xaxis: { gridcolor: gridColor, color: textColor, tickfont: { color: textColor, size: 10 } },
+                  xaxis: { type: "date", tickformat: "%b '%y", gridcolor: gridColor, color: textColor, tickfont: { color: textColor, size: 10 } },
                   yaxis: { gridcolor: gridColor, color: textColor, tickfont: { color: textColor, size: 10 }, title: { text: "Flow", font: { color: textColor, size: 10 } } },
                 }}
                 config={{ responsive: true, displayModeBar: false, displaylogo: false }}

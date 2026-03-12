@@ -195,7 +195,7 @@ export function FlowCompareModal({ symbols, timeframe, onClose }: Props) {
                     plot_bgcolor: bgColor,
                     height: 240,
                     margin: { l: 55, r: 16, t: 10, b: 40 },
-                    xaxis: { gridcolor: gridColor, color: textColor, tickfont: { color: textColor, size: 10 } },
+                    xaxis: { type: "date", tickformat: "%b '%y", gridcolor: gridColor, color: textColor, tickfont: { color: textColor, size: 10 } },
                     yaxis: {
                       gridcolor: gridColor, color: textColor, tickfont: { color: textColor, size: 10 },
                       zeroline: true, zerolinecolor: zeroLine, range: [-1.05, 1.05],
@@ -236,7 +236,7 @@ export function FlowCompareModal({ symbols, timeframe, onClose }: Props) {
                   plot_bgcolor: bgColor,
                   height: 220,
                   margin: { l: 55, r: 16, t: 10, b: 40 },
-                  xaxis: { gridcolor: gridColor, color: textColor, tickfont: { color: textColor, size: 10 } },
+                  xaxis: { type: "date", tickformat: "%b '%y", gridcolor: gridColor, color: textColor, tickfont: { color: textColor, size: 10 } },
                   yaxis: {
                     gridcolor: gridColor, color: textColor, tickfont: { color: textColor, size: 10 },
                     title: { text: "Normalized", font: { color: textColor, size: 10 } },
@@ -271,7 +271,7 @@ export function FlowCompareModal({ symbols, timeframe, onClose }: Props) {
                   plot_bgcolor: bgColor,
                   height: 200,
                   margin: { l: 55, r: 16, t: 10, b: 40 },
-                  xaxis: { gridcolor: gridColor, color: textColor, tickfont: { color: textColor, size: 10 } },
+                  xaxis: { type: "date", tickformat: "%b '%y", gridcolor: gridColor, color: textColor, tickfont: { color: textColor, size: 10 } },
                   yaxis: {
                     gridcolor: gridColor, color: textColor, tickfont: { color: textColor, size: 10 },
                     title: { text: "Normalized", font: { color: textColor, size: 10 } },
