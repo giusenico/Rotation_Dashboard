@@ -1,10 +1,12 @@
-name: Intraday 4h Market Data Fetch
+name: Intraday Market Data Fetch
 
 on:
   # Run 3x/day on weekdays covering major market sessions:
   #   14:00 UTC — Asian close / European afternoon
   #   18:00 UTC — Mid US session
   #   22:00 UTC — After US close
+  # Daily prices are fetched as provisional (partial candle) during the day
+  # and overwritten with final closing data by the daily_fetch workflow at 22:00 UTC.
   schedule:
     - cron: '0 14,18,22 * * 1-5'
 
@@ -26,6 +28,16 @@ jobs:
 
       - name: Install dependencies
         run: pip install -r requirements.txt
+
+      - name: Fetch daily prices (provisional during market hours)
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: python scripts/fetch_data.py
+
+      - name: Update OBV daily metrics
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: python scripts/update_flow.py
 
       - name: Fetch intraday 4h data
         env:
