@@ -18,11 +18,17 @@ from datetime import datetime, timedelta
 
 import pandas as pd
 import psycopg2
+from psycopg2.extras import execute_values
 import yfinance as yf
 
 # Ensure the project root is on the Python path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from config import ALL_TICKERS, HISTORY_YEARS, SUPABASE_DB_URL
+
+
+def connect():
+    """Create a new database connection."""
+    return psycopg2.connect(SUPABASE_DB_URL)
 
 
 def get_last_date(conn, symbol: str) -> str | None:
@@ -38,7 +44,7 @@ def get_last_date(conn, symbol: str) -> str | None:
 def fetch_and_store(conn, symbol: str, start: str, end: str) -> int:
     """
     Download daily data for *symbol* between *start* and *end* (ISO dates)
-    and insert rows into the database.
+    and insert rows into the database using batch upsert.
 
     Returns the number of rows inserted.
     """
@@ -61,36 +67,42 @@ def fetch_and_store(conn, symbol: str, start: str, end: str) -> int:
         if col not in df.columns:
             df[col] = None
 
-    rows_inserted = 0
+    # Build list of tuples for batch upsert
+    values = []
+    for date_idx, row in df.iterrows():
+        values.append((
+            symbol,
+            date_idx.strftime("%Y-%m-%d"),
+            float(row["open"]) if pd.notna(row["open"]) else None,
+            float(row["high"]) if pd.notna(row["high"]) else None,
+            float(row["low"]) if pd.notna(row["low"]) else None,
+            float(row["close"]) if pd.notna(row["close"]) else None,
+            float(row["adj_close"]) if pd.notna(row["adj_close"]) else None,
+            int(row["volume"]) if pd.notna(row["volume"]) else None,
+        ))
+
+    if not values:
+        return 0
+
     with conn.cursor() as cur:
-        for date_idx, row in df.iterrows():
-            date_str = date_idx.strftime("%Y-%m-%d")
-            cur.execute(
-                """INSERT INTO daily_prices
-                   (symbol, date, open, high, low, close, adj_close, volume)
-                   VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-                   ON CONFLICT (symbol, date) DO UPDATE SET
-                     open = EXCLUDED.open,
-                     high = EXCLUDED.high,
-                     low = EXCLUDED.low,
-                     close = EXCLUDED.close,
-                     adj_close = EXCLUDED.adj_close,
-                     volume = EXCLUDED.volume""",
-                (
-                    symbol,
-                    date_str,
-                    float(row["open"]) if pd.notna(row["open"]) else None,
-                    float(row["high"]) if pd.notna(row["high"]) else None,
-                    float(row["low"]) if pd.notna(row["low"]) else None,
-                    float(row["close"]) if pd.notna(row["close"]) else None,
-                    float(row["adj_close"]) if pd.notna(row["adj_close"]) else None,
-                    int(row["volume"]) if pd.notna(row["volume"]) else None,
-                ),
-            )
-            rows_inserted += 1
+        execute_values(
+            cur,
+            """INSERT INTO daily_prices
+               (symbol, date, open, high, low, close, adj_close, volume)
+               VALUES %s
+               ON CONFLICT (symbol, date) DO UPDATE SET
+                 open = EXCLUDED.open,
+                 high = EXCLUDED.high,
+                 low = EXCLUDED.low,
+                 close = EXCLUDED.close,
+                 adj_close = EXCLUDED.adj_close,
+                 volume = EXCLUDED.volume""",
+            values,
+            page_size=500,
+        )
 
     conn.commit()
-    return rows_inserted
+    return len(values)
 
 
 def main() -> None:
@@ -103,13 +115,6 @@ def main() -> None:
         help="Force a full historical fetch (ignores existing data).",
     )
     args = parser.parse_args()
-
-    print("Connecting to Supabase PostgreSQL ...")
-    try:
-        conn = psycopg2.connect(SUPABASE_DB_URL)
-    except Exception as exc:
-        print(f"[FATAL] Could not connect to database: {exc}")
-        sys.exit(1)
 
     # yfinance treats `end` as exclusive, so we use tomorrow to include today's data
     end_date = (datetime.today() + timedelta(days=1)).strftime("%Y-%m-%d")
@@ -126,6 +131,14 @@ def main() -> None:
     print(f"Date range: {full_start} -> {end_date}\n")
 
     for i, symbol in enumerate(symbols, 1):
+        # Fresh connection per ticker to avoid timeout on long runs
+        try:
+            conn = connect()
+        except Exception as exc:
+            errors += 1
+            print(f"  [{i}/{len(symbols)}] {symbol} — [ERROR] connect: {exc}")
+            continue
+
         try:
             if args.full:
                 start_date = full_start
@@ -138,6 +151,7 @@ def main() -> None:
                     ).strftime("%Y-%m-%d")
                     if start_date >= end_date:
                         print(f"  [{i}/{len(symbols)}] {symbol} — already up to date")
+                        conn.close()
                         continue
                 else:
                     start_date = full_start
@@ -148,10 +162,12 @@ def main() -> None:
         except Exception as exc:
             errors += 1
             print(f"  [{i}/{len(symbols)}] {symbol} — [ERROR] {exc}")
-            # Rollback the failed transaction so the connection stays usable
-            conn.rollback()
+        finally:
+            try:
+                conn.close()
+            except Exception:
+                pass
 
-    conn.close()
     print(f"\nDone. {total_inserted} total rows inserted, {errors} errors.")
     if errors:
         sys.exit(1)

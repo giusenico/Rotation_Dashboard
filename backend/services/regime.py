@@ -315,7 +315,7 @@ def get_regime_summary(
 
     params = TIMEFRAME_PARAMS[timeframe]
     ticker_map = {s: n for s, n in ALL_TICKERS.items()
-                  if TICKER_CATEGORY_MAP.get(s) != "Volatility Index"}
+                  if TICKER_CATEGORY_MAP.get(s) not in ("Volatility Index", "Macro Only")}
     symbols = list(ticker_map.keys())
     data_map = _fetch_for_timeframe(conn, symbols, timeframe)
 
@@ -386,7 +386,7 @@ def get_regime_detail(
         overext_mode = "Z"
 
     ticker_map = {s: n for s, n in ALL_TICKERS.items()
-                  if TICKER_CATEGORY_MAP.get(s) != "Volatility Index"}
+                  if TICKER_CATEGORY_MAP.get(s) not in ("Volatility Index", "Macro Only")}
     if symbol not in ticker_map:
         return None
 

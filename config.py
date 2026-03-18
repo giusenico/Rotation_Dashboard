@@ -29,7 +29,7 @@ SCHEMA_PATH = os.path.join(BASE_DIR, "db", "schema.sql")
 # ---------------------------------------------------------------------------
 # History settings
 # ---------------------------------------------------------------------------
-HISTORY_YEARS = 10  # how many years of daily data to fetch
+HISTORY_YEARS = 16  # fetch daily data back to 2010
 
 # ---------------------------------------------------------------------------
 # Asset categories (must match the seed data in init_db.py)
@@ -42,6 +42,7 @@ CATEGORIES = {
     "Crypto ETF": 5,
     "Benchmark": 6,
     "Volatility Index": 7,
+    "Macro Only": 8,
 }
 
 # ---------------------------------------------------------------------------
@@ -70,6 +71,7 @@ CROSS_ASSET_ETFS = {
     "SHV": "Short Treasury Bonds (0-1 Year)",
     "IEF": "7-10 Year US Treasury Bonds",
     "TLT": "20+ Year US Treasury Bonds",
+    "IGOV": "International Treasury Bonds",
     "SPYV": "S&P 500 Value",
     "SPEU": "Europe Equities",
     "EEMA": "Asia Emerging Markets Equities",
@@ -99,6 +101,14 @@ VOLATILITY_INDICES = {
 }
 
 # ---------------------------------------------------------------------------
+# Macro-only tickers — used exclusively by the macro risk-on/off engine
+# ---------------------------------------------------------------------------
+MACRO_ONLY = {
+    "SPY": "SPDR S&P 500 ETF",
+    "BTC-USD": "Bitcoin USD",
+}
+
+# ---------------------------------------------------------------------------
 # Mapping: symbol -> category name (used by init_db to seed tickers)
 # ---------------------------------------------------------------------------
 TICKER_CATEGORY_MAP: dict[str, str] = {}
@@ -107,7 +117,7 @@ for sym in SECTOR_ETFS:
     TICKER_CATEGORY_MAP[sym] = "Sector ETF"
 
 for sym in CROSS_ASSET_ETFS:
-    if sym in ("BND", "SHY", "SHV", "IEF", "TLT"):
+    if sym in ("BND", "SHY", "SHV", "IEF", "TLT", "IGOV"):
         TICKER_CATEGORY_MAP[sym] = "Bond ETF"
     elif sym in ("GLD", "SLV", "USO", "BNO"):
         TICKER_CATEGORY_MAP[sym] = "Commodity ETF"
@@ -122,7 +132,10 @@ for sym in BENCHMARK:
 for sym in VOLATILITY_INDICES:
     TICKER_CATEGORY_MAP[sym] = "Volatility Index"
 
+for sym in MACRO_ONLY:
+    TICKER_CATEGORY_MAP[sym] = "Macro Only"
+
 # ---------------------------------------------------------------------------
 # Convenience: all tickers in a single dict  symbol -> human-readable name
 # ---------------------------------------------------------------------------
-ALL_TICKERS: dict[str, str] = {**SECTOR_ETFS, **CROSS_ASSET_ETFS, **BENCHMARK, **VOLATILITY_INDICES}
+ALL_TICKERS: dict[str, str] = {**SECTOR_ETFS, **CROSS_ASSET_ETFS, **BENCHMARK, **VOLATILITY_INDICES, **MACRO_ONLY}
