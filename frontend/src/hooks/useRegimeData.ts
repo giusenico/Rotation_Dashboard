@@ -6,8 +6,6 @@ export function useRegimeSummary(timeframe: RegimeTimeframe = "daily", overextMo
   return useQuery({
     queryKey: ["regime", "summary", timeframe, overextMode],
     queryFn: () => fetchRegimeSummary(timeframe, overextMode),
-    staleTime: 5 * 60 * 1000,
-    gcTime: 30 * 60 * 1000,
   });
 }
 
@@ -21,7 +19,5 @@ export function useRegimeDetail(
     queryKey: ["regime", "detail", symbol, lookback, timeframe, overextMode],
     queryFn: () => fetchRegimeDetail(symbol!, lookback, timeframe, overextMode),
     enabled: symbol !== null,
-    staleTime: 5 * 60 * 1000,
-    gcTime: 30 * 60 * 1000,
   });
 }

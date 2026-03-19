@@ -4,15 +4,16 @@ import { useSectorRankings, useCrossAssetRankings } from "../hooks/useRRGData";
 import { useOBVStructure } from "../hooks/useFlowData";
 import { useRegimeSummary } from "../hooks/useRegimeData";
 import { LoadingSpinner } from "../components/common/LoadingSpinner";
+import { MacroHeroCard } from "../components/charts/MacroHeroCard";
 import { formatPct, formatDate } from "../utils/formatters";
 import { Link } from "react-router-dom";
-import { getTickerColor } from "../utils/colors";
 import type { RankingEntry } from "../types/rrg";
 import type { RegimeSummaryEntry } from "../types/regime";
 import type { OBVStructureEntry } from "../types/flow";
 import type { LucideProps } from "lucide-react";
 import {
   TrendingUp,
+  TrendingDown,
   Radar,
   Globe,
   Gauge,
@@ -20,16 +21,33 @@ import {
   Zap,
 } from "lucide-react";
 
-const QUADRANT_COLORS: Record<string, string> = {
-  Leading: "var(--success)",
-  Weakening: "var(--warning)",
-  Lagging: "var(--danger)",
-  Improving: "var(--accent)",
+// ── All colors via CSS variables (shared with hero card) ─────────
+const V = {
+  pos: "var(--dash-positive)",
+  neg: "var(--dash-negative)",
+  neutral: "var(--dash-neutral)",
+  ink: "var(--dash-ink)",
+  posBg: "var(--dash-positive-bg)",
+  negBg: "var(--dash-negative-bg)",
 };
 
-// ── Rotation Snapshot ──────────────────────────────────────────────
+const QUADRANT_COLOR: Record<string, string> = {
+  Leading: V.pos,
+  Improving: V.pos,
+  Weakening: V.neg,
+  Lagging: V.neg,
+};
 
-function RotationSnapshot({
+const QUADRANT_BG: Record<string, string> = {
+  Leading: V.posBg,
+  Improving: V.posBg,
+  Weakening: V.negBg,
+  Lagging: V.negBg,
+};
+
+// ── Compact Rotation Snapshot ─────────────────────────────────────
+
+function RotationSnapshotCompact({
   title,
   icon: Icon,
   rankings,
@@ -47,34 +65,37 @@ function RotationSnapshot({
     if (r.quadrant in quadrants) quadrants[r.quadrant as keyof typeof quadrants]++;
   }
 
-  const top5 = rankings.slice(0, 5);
+  const top3 = rankings.slice(0, 3);
 
   return (
-    <div className="dashboard-chart-section">
-      <div className="section-header">
-        <h2>
-          <Icon size={16} style={{ display: "inline", marginRight: 6, verticalAlign: "middle" }} />
+    <div className="dash-compact-panel">
+      <div className="dash-compact-header">
+        <h3>
+          <Icon size={13} style={{ display: "inline", marginRight: 5, verticalAlign: "middle" }} />
           {title}
-        </h2>
-        <Link to={linkTo} className="view-full-link">Full Analysis &rarr;</Link>
+        </h3>
+        <Link to={linkTo} className="view-full-link">Details &rarr;</Link>
       </div>
 
-      <div className="dash-quadrant-row">
+      <div className="dash-quadrant-row dash-quadrant-row--compact">
         {(["Leading", "Weakening", "Improving", "Lagging"] as const).map((q) => (
-          <span key={q} className="dash-q-badge" style={{ color: QUADRANT_COLORS[q] }}>
-            <strong>{quadrants[q]}</strong> {q}
+          <span
+            key={q}
+            className="dash-q-badge dash-q-badge--sm"
+            style={{ background: QUADRANT_BG[q], color: QUADRANT_COLOR[q] }}
+          >
+            <strong style={{ color: QUADRANT_COLOR[q] }}>{quadrants[q]}</strong> {q}
           </span>
         ))}
       </div>
 
       <div className="dash-top-list">
-        {top5.map((entry, i) => (
-          <div key={entry.ticker} className="obv-leaderboard-row">
+        {top3.map((entry, i) => (
+          <div key={entry.ticker} className="obv-leaderboard-row obv-leaderboard-row--sm">
             <span className="obv-lb-rank">{i + 1}</span>
-            <span className="ticker-dot" style={{ background: getTickerColor(entry.ticker) }} />
             <span className="ticker-cell">{entry.ticker}</span>
             <span className="obv-lb-name">{entry.name}</span>
-            <span className="dash-q-pill" style={{ color: QUADRANT_COLORS[entry.quadrant] }}>
+            <span className="dash-q-pill" style={{ color: QUADRANT_COLOR[entry.quadrant] || V.neutral }}>
               {entry.quadrant}
             </span>
           </div>
@@ -84,9 +105,9 @@ function RotationSnapshot({
   );
 }
 
-// ── Market Signals ─────────────────────────────────────────────────
+// ── Compact Market Signals ────────────────────────────────────────
 
-function MarketSignals({ regimeData }: { regimeData: RegimeSummaryEntry[] }) {
+function SignalsStrip({ regimeData }: { regimeData: RegimeSummaryEntry[] }) {
   const overbought = regimeData.filter((e) => e.overext_label === "overbought");
   const oversold = regimeData.filter((e) => e.overext_label === "oversold");
   const inflow = regimeData.filter((e) => e.flow_label === "strong_inflow");
@@ -95,114 +116,82 @@ function MarketSignals({ regimeData }: { regimeData: RegimeSummaryEntry[] }) {
   const hasSignals = overbought.length + oversold.length + inflow.length + outflow.length > 0;
   if (!hasSignals) return null;
 
+  const columns: { label: string; color: string; bg: string; items: RegimeSummaryEntry[] }[] = [
+    { label: "Overbought", color: V.neg, bg: V.negBg, items: overbought },
+    { label: "Oversold", color: V.pos, bg: V.posBg, items: oversold },
+    { label: "Inflow", color: V.pos, bg: V.posBg, items: inflow },
+    { label: "Outflow", color: V.neg, bg: V.negBg, items: outflow },
+  ];
+
   return (
-    <div className="dashboard-chart-section">
-      <div className="section-header">
-        <h2>
-          <Zap size={16} style={{ display: "inline", marginRight: 6, verticalAlign: "middle" }} />
+    <div className="dash-compact-panel">
+      <div className="dash-compact-header">
+        <h3>
+          <Zap size={13} style={{ display: "inline", marginRight: 5, verticalAlign: "middle" }} />
           Active Signals
-        </h2>
-        <Link to="/regime" className="view-full-link">Regime Details &rarr;</Link>
+        </h3>
+        <Link to="/regime" className="view-full-link">Regime &rarr;</Link>
       </div>
 
-      <div className="dash-signals-grid">
-        {overbought.length > 0 && (
-          <div className="dash-signal-group">
-            <span className="dash-signal-label positive">Overbought</span>
-            <div className="dash-signal-tickers">
-              {overbought.map((e) => (
-                <span key={e.symbol} className="dash-signal-chip positive">
-                  <span className="ticker-dot" style={{ background: getTickerColor(e.symbol) }} />
-                  {e.symbol}
-                  <small>{e.overextension?.toFixed(1)}</small>
-                </span>
-              ))}
+      <div className="dash-signals-cols">
+        {columns.map((col) => (
+          <div key={col.label} className="dash-signals-col">
+            <div className="dash-signals-col-header">
+              <span className="dash-signal-label" style={{ color: col.color }}>{col.label}</span>
+              <span className="dash-signals-col-count" style={{ color: col.color }}>{col.items.length}</span>
             </div>
-          </div>
-        )}
-        {oversold.length > 0 && (
-          <div className="dash-signal-group">
-            <span className="dash-signal-label negative">Oversold</span>
-            <div className="dash-signal-tickers">
-              {oversold.map((e) => (
-                <span key={e.symbol} className="dash-signal-chip negative">
-                  <span className="ticker-dot" style={{ background: getTickerColor(e.symbol) }} />
-                  {e.symbol}
-                  <small>{e.overextension?.toFixed(1)}</small>
-                </span>
-              ))}
-            </div>
-          </div>
-        )}
-        {inflow.length > 0 && (
-          <div className="dash-signal-group">
-            <span className="dash-signal-label positive">Strong Inflow</span>
-            <div className="dash-signal-tickers">
-              {inflow.map((e) => (
-                <span key={e.symbol} className="dash-signal-chip positive">
-                  <span className="ticker-dot" style={{ background: getTickerColor(e.symbol) }} />
+            <div className="dash-signals-col-list">
+              {col.items.length > 0 ? col.items.map((e) => (
+                <span key={e.symbol} className="dash-signal-chip dash-signal-chip--sm" style={{ background: col.bg, color: col.color }}>
                   {e.symbol}
                 </span>
-              ))}
+              )) : (
+                <span className="dash-signals-col-empty">&mdash;</span>
+              )}
             </div>
           </div>
-        )}
-        {outflow.length > 0 && (
-          <div className="dash-signal-group">
-            <span className="dash-signal-label negative">Strong Outflow</span>
-            <div className="dash-signal-tickers">
-              {outflow.map((e) => (
-                <span key={e.symbol} className="dash-signal-chip negative">
-                  <span className="ticker-dot" style={{ background: getTickerColor(e.symbol) }} />
-                  {e.symbol}
-                </span>
-              ))}
-            </div>
-          </div>
-        )}
+        ))}
       </div>
     </div>
   );
 }
 
-// ── Capital Flow Leaders ───────────────────────────────────────────
+// ── Compact Capital Flow Leaders ──────────────────────────────────
 
-function FlowLeaders({ data }: { data: OBVStructureEntry[] }) {
+function FlowLeadersCompact({ data }: { data: OBVStructureEntry[] }) {
   const sorted = [...data].sort((a, b) => (b.rotation_score ?? -1) - (a.rotation_score ?? -1));
-  const topBuy = sorted.filter((e) => e.obv_regime === "buy").slice(0, 5);
-  const topSell = sorted.filter((e) => e.obv_regime === "sell").reverse().slice(0, 5);
+  const topBuy = sorted.filter((e) => e.obv_regime === "buy").slice(0, 3);
+  const topSell = sorted.filter((e) => e.obv_regime === "sell").reverse().slice(0, 3);
 
   return (
-    <div className="dashboard-chart-section">
-      <div className="section-header">
-        <h2>
-          <Activity size={16} style={{ display: "inline", marginRight: 6, verticalAlign: "middle" }} />
+    <div className="dash-compact-panel">
+      <div className="dash-compact-header">
+        <h3>
+          <Activity size={13} style={{ display: "inline", marginRight: 5, verticalAlign: "middle" }} />
           Capital Flow Leaders
-        </h2>
-        <Link to="/capital-flow" className="view-full-link">View Details &rarr;</Link>
+        </h3>
+        <Link to="/capital-flow" className="view-full-link">Details &rarr;</Link>
       </div>
       <div className="obv-preview-cols">
         <div className="obv-preview-col">
-          <div className="obv-col-header positive">Top Accumulation</div>
+          <div className="obv-col-header" style={{ color: V.pos }}>Accumulation</div>
           {topBuy.map((entry, i) => (
-            <div key={entry.symbol} className="obv-leaderboard-row">
+            <div key={entry.symbol} className="obv-leaderboard-row obv-leaderboard-row--sm">
               <span className="obv-lb-rank">{i + 1}</span>
-              <span className="ticker-dot" style={{ background: getTickerColor(entry.symbol) }} />
               <span className="ticker-cell">{entry.symbol}</span>
               <span className="obv-lb-name">{entry.asset}</span>
-              <span className="obv-lb-score positive">{entry.rotation_score?.toFixed(3) ?? "—"}</span>
+              <span className="obv-lb-score" style={{ color: V.pos }}>{entry.rotation_score?.toFixed(3) ?? "—"}</span>
             </div>
           ))}
         </div>
         <div className="obv-preview-col">
-          <div className="obv-col-header negative">Top Distribution</div>
+          <div className="obv-col-header" style={{ color: V.neg }}>Distribution</div>
           {topSell.map((entry, i) => (
-            <div key={entry.symbol} className="obv-leaderboard-row">
+            <div key={entry.symbol} className="obv-leaderboard-row obv-leaderboard-row--sm">
               <span className="obv-lb-rank">{i + 1}</span>
-              <span className="ticker-dot" style={{ background: getTickerColor(entry.symbol) }} />
               <span className="ticker-cell">{entry.symbol}</span>
               <span className="obv-lb-name">{entry.asset}</span>
-              <span className="obv-lb-score negative">{entry.rotation_score?.toFixed(3) ?? "—"}</span>
+              <span className="obv-lb-score" style={{ color: V.neg }}>{entry.rotation_score?.toFixed(3) ?? "—"}</span>
             </div>
           ))}
         </div>
@@ -214,7 +203,7 @@ function FlowLeaders({ data }: { data: OBVStructureEntry[] }) {
 // ── Main Dashboard ─────────────────────────────────────────────────
 
 export function DashboardPage() {
-  const { data: summary, isLoading } = useDashboardSummary();
+  const { data: summary, isLoading: summaryLoading } = useDashboardSummary();
   const { data: sectorRankings } = useSectorRankings();
   const { data: crossRankings } = useCrossAssetRankings();
   const { data: obvData } = useOBVStructure("weekly");
@@ -235,96 +224,133 @@ export function DashboardPage() {
     return { buy, sell, total: obvData.length };
   }, [obvData]);
 
-  if (isLoading) return <LoadingSpinner message="Loading dashboard..." />;
+  const spPositive = (summary?.sp500_return_ytd ?? 0) >= 0;
 
   return (
     <div className="dashboard-page">
-      {/* Section 1: Market Pulse */}
-      <div className="summary-cards">
-        <div className="card">
-          <div className="card-icon"><TrendingUp size={20} /></div>
-          <div className="card-content">
-            <span className="card-label">S&P 500 YTD</span>
-            <span className="card-value">
-              <span className={(summary?.sp500_return_ytd ?? 0) >= 0 ? "positive" : "negative"}>
-                {formatPct(summary?.sp500_return_ytd)}
-              </span>
-            </span>
-            {summary?.latest_date && (
-              <span className="card-secondary">as of {formatDate(summary.latest_date)}</span>
-            )}
-          </div>
-        </div>
-
-        <div className="card">
-          <div className="card-icon"><Gauge size={20} /></div>
-          <div className="card-content">
-            <span className="card-label">Market Regime</span>
-            {regimeBreadth ? (
-              <>
-                <div className="dash-breadth-nums">
-                  <span className="positive">{regimeBreadth.bull} Bull</span>
-                  {regimeBreadth.flat > 0 && <span className="dash-breadth-flat">{regimeBreadth.flat} Flat</span>}
-                  <span className="negative">{regimeBreadth.bear} Bear</span>
-                </div>
-                <div className="dash-minibar-track">
-                  <div
-                    className="dash-minibar-fill dash-minibar-fill--pos"
-                    style={{ width: `${Math.round((regimeBreadth.bull / regimeBreadth.total) * 100)}%` }}
-                  />
-                </div>
-              </>
-            ) : (
-              <span className="card-value">—</span>
-            )}
-          </div>
-        </div>
-
-        <div className="card">
-          <div className="card-icon"><Activity size={20} /></div>
-          <div className="card-content">
-            <span className="card-label">Capital Flows</span>
-            {flowBreadth ? (
-              <>
-                <div className="dash-breadth-nums">
-                  <span className="positive">{flowBreadth.buy} Accum</span>
-                  <span className="negative">{flowBreadth.sell} Distrib</span>
-                </div>
-                <div className="dash-minibar-track">
-                  <div
-                    className="dash-minibar-fill dash-minibar-fill--pos"
-                    style={{ width: `${Math.round((flowBreadth.buy / flowBreadth.total) * 100)}%` }}
-                  />
-                </div>
-              </>
-            ) : (
-              <span className="card-value">—</span>
-            )}
-          </div>
-        </div>
+      {/* Left: Macro Hero Card */}
+      <div className="dashboard-left">
+        <MacroHeroCard />
       </div>
 
-      {/* Section 2: Rotation Snapshot */}
-      <div className="dashboard-charts">
-        <RotationSnapshot
-          title="Sector Rotation"
-          icon={Radar}
-          rankings={sectorRankings}
-          linkTo="/rrg/sectors"
-        />
-        <RotationSnapshot
-          title="Cross-Asset Rotation"
-          icon={Globe}
-          rankings={crossRankings}
-          linkTo="/rrg/cross-asset"
-        />
+      {/* Right: All data panels — render progressively */}
+      <div className="dashboard-right">
+        {/* Row 1: Stat cards (show skeleton while loading) */}
+        <div className="dash-stat-row">
+          <div className="card card--compact">
+            <div className="card-icon" style={{ color: spPositive ? V.pos : V.neg, opacity: 1 }}>
+              {spPositive ? <TrendingUp size={18} /> : <TrendingDown size={18} />}
+            </div>
+            <div className="card-content">
+              <span className="card-label">S&P 500 YTD</span>
+              {summaryLoading ? (
+                <span className="card-value card-value--sm dash-skeleton">&nbsp;</span>
+              ) : (
+                <span
+                  className="card-value card-value--sm"
+                  style={{ color: spPositive ? V.pos : V.neg }}
+                >
+                  {formatPct(summary?.sp500_return_ytd)}
+                </span>
+              )}
+              {summary?.latest_date && (
+                <span className="card-secondary">as of {formatDate(summary.latest_date)}</span>
+              )}
+            </div>
+          </div>
+
+          <div className="card card--compact">
+            <div className="card-icon" style={{
+              color: regimeBreadth
+                ? (regimeBreadth.bull >= regimeBreadth.bear ? V.pos : V.neg)
+                : "var(--accent)",
+              opacity: regimeBreadth ? 1 : 0.7,
+            }}>
+              <Gauge size={18} />
+            </div>
+            <div className="card-content">
+              <span className="card-label">Market Regime</span>
+              {regimeBreadth ? (
+                <>
+                  <div className="dash-breadth-nums">
+                    <span style={{ color: V.pos }}>{regimeBreadth.bull} Bull</span>
+                    {regimeBreadth.flat > 0 && <span style={{ color: V.neutral }}>{regimeBreadth.flat} Flat</span>}
+                    <span style={{ color: V.neg }}>{regimeBreadth.bear} Bear</span>
+                  </div>
+                  <div className="dash-minibar-track" style={{ background: V.neg }}>
+                    <div
+                      className="dash-minibar-fill"
+                      style={{ width: `${Math.round((regimeBreadth.bull / regimeBreadth.total) * 100)}%`, background: V.pos }}
+                    />
+                  </div>
+                </>
+              ) : (
+                <div className="dash-skeleton dash-skeleton--bar">&nbsp;</div>
+              )}
+            </div>
+          </div>
+
+          <div className="card card--compact">
+            <div className="card-icon" style={{
+              color: flowBreadth
+                ? (flowBreadth.buy >= flowBreadth.sell ? V.pos : V.neg)
+                : "var(--accent)",
+              opacity: flowBreadth ? 1 : 0.7,
+            }}>
+              <Activity size={18} />
+            </div>
+            <div className="card-content">
+              <span className="card-label">Capital Flows</span>
+              {flowBreadth ? (
+                <>
+                  <div className="dash-breadth-nums">
+                    <span style={{ color: V.pos }}>{flowBreadth.buy} Accum</span>
+                    <span style={{ color: V.neg }}>{flowBreadth.sell} Distrib</span>
+                  </div>
+                  <div className="dash-minibar-track" style={{ background: V.neg }}>
+                    <div
+                      className="dash-minibar-fill"
+                      style={{ width: `${Math.round((flowBreadth.buy / flowBreadth.total) * 100)}%`, background: V.pos }}
+                    />
+                  </div>
+                </>
+              ) : (
+                <div className="dash-skeleton dash-skeleton--bar">&nbsp;</div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Row 2: Rotation Snapshots (render when available) */}
+        <div className="dash-rotation-row">
+          {sectorRankings ? (
+            <RotationSnapshotCompact
+              title="Sector Rotation"
+              icon={Radar}
+              rankings={sectorRankings}
+              linkTo="/rrg/sectors"
+            />
+          ) : (
+            <div className="dash-compact-panel dash-skeleton dash-skeleton--panel">&nbsp;</div>
+          )}
+          {crossRankings ? (
+            <RotationSnapshotCompact
+              title="Cross-Asset Rotation"
+              icon={Globe}
+              rankings={crossRankings}
+              linkTo="/rrg/cross-asset"
+            />
+          ) : (
+            <div className="dash-compact-panel dash-skeleton dash-skeleton--panel">&nbsp;</div>
+          )}
+        </div>
+
+        {/* Row 3: Active Signals (render when available) */}
+        {regimeData && <SignalsStrip regimeData={regimeData} />}
+
+        {/* Row 4: Capital Flow Leaders (render when available) */}
+        {obvData && <FlowLeadersCompact data={obvData} />}
       </div>
-
-      {/* Section 3: Active Signals */}
-      {regimeData && <MarketSignals regimeData={regimeData} />}
-
-      {/* Section 4: Capital Flow Leaders */}
-      {obvData && <FlowLeaders data={obvData} />}
     </div>
   );
 }

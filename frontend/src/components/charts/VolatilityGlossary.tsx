@@ -55,9 +55,9 @@ function SectionContent({ section }: { section: VolSection }) {
               <dt>Gauge Bars</dt>
               <dd>
                 Each card shows a coloured progress bar:
-                <strong style={{ color: "var(--success)" }}> green</strong> = Low Risk (below 30%),
-                <strong style={{ color: "var(--warning, #f5a623)" }}> orange</strong> = Moderate,
-                <strong style={{ color: "var(--danger)" }}> red</strong> = High Risk (above 70%).
+                <strong style={{ color: "var(--dash-positive)" }}> blue</strong> = Low Risk (below 30%),
+                <strong style={{ color: "var(--dash-neutral)" }}> grey</strong> = Moderate,
+                <strong style={{ color: "var(--dash-negative)" }}> red</strong> = High Risk (above 70%).
               </dd>
             </dl>
             <div className="glossary-tip">

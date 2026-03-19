@@ -7,6 +7,7 @@ import { PriceExplorerPage } from "./pages/PriceExplorerPage";
 import { FlowStructurePage } from "./pages/FlowStructurePage";
 import { MarketRegimePage } from "./pages/MarketRegimePage";
 import { VolatilityPage } from "./pages/VolatilityPage";
+import { ComparePage } from "./pages/ComparePage";
 
 function NotFoundPage() {
   return (
@@ -31,6 +32,7 @@ const router = createBrowserRouter([
 { path: "capital-flow", element: <FlowStructurePage /> },
       { path: "regime", element: <MarketRegimePage /> },
       { path: "volatility", element: <VolatilityPage /> },
+      { path: "compare", element: <ComparePage /> },
       { path: "*", element: <NotFoundPage /> },
     ],
   },

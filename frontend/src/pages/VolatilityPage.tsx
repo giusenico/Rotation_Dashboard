@@ -55,7 +55,7 @@ function SignalCard({ signal, position }: { signal: string; position: string }) 
 
   return (
     <div className="card" style={{ justifyContent: "center" }}>
-      <div className="card-icon" style={{ color: info.cls === "positive" ? "var(--success)" : info.cls === "negative" ? "var(--danger)" : "var(--text-muted)" }}>
+      <div className="card-icon" style={{ color: info.cls === "positive" ? "var(--dash-positive)" : info.cls === "negative" ? "var(--dash-negative)" : "var(--text-muted)" }}>
         <Icon size={20} />
       </div>
       <div className="card-content" style={{ alignItems: "center", textAlign: "center" }}>
@@ -89,10 +89,10 @@ function OscGauge({ value, label }: { value: number | null; label: string }) {
   const fillColor = value == null
     ? "var(--text-muted)"
     : value < 0.3
-      ? "var(--success)"
+      ? "var(--dash-positive)"
       : value > 0.7
-        ? "var(--danger)"
-        : "var(--warning, #f5a623)";
+        ? "var(--dash-negative)"
+        : "var(--dash-neutral)";
 
   return (
     <div style={{ width: "100%", marginTop: 4 }}>
@@ -124,12 +124,12 @@ function useChartColors() {
     bg: "rgba(0,0,0,0)",
     grid: cssVar("--chart-grid"),
     text: cssVar("--chart-text"),
-    green: cssVar("--success"),
-    red: cssVar("--danger"),
+    green: cssVar("--dash-positive"),
+    red: cssVar("--dash-negative"),
     muted: cssVar("--text-muted"),
-    blue: "#6395ed",
-    orange: "#f5a623",
-    cyan: "#45c8dc",
+    blue: cssVar("--dash-positive"),
+    orange: cssVar("--dash-negative"),
+    cyan: cssVar("--dash-neutral"),
   };
 }
 
@@ -205,8 +205,8 @@ function ChartSection({
 
 function oscColor(v: number | null) {
   if (v == null) return undefined;
-  if (v < 0.3) return "var(--success)";
-  if (v > 0.7) return "var(--danger)";
+  if (v < 0.3) return "var(--dash-positive)";
+  if (v > 0.7) return "var(--dash-negative)";
   return "var(--text-primary)";
 }
 
@@ -234,7 +234,7 @@ function BacktestStats({
       <span>Buy &amp; Hold: <strong style={{ color: "var(--text-primary)" }}>{benchRet}%</strong></span>
       <span>
         Alpha:{" "}
-        <strong style={{ color: alphaNum >= 0 ? "var(--success)" : "var(--danger)" }}>
+        <strong style={{ color: alphaNum >= 0 ? "var(--dash-positive)" : "var(--dash-negative)" }}>
           {alphaNum >= 0 ? "+" : ""}{alpha}%
         </strong>
       </span>
@@ -333,7 +333,7 @@ export function VolatilityPage() {
           x1: end,
           y0: 0,
           y1: 1,
-          fillcolor: "rgba(0,200,100,0.04)",
+          fillcolor: cssVar("--positive-fill"),
           line: { width: 0 },
           layer: "below",
         } as Plotly.Shape);
@@ -411,13 +411,13 @@ export function VolatilityPage() {
           </div>
         </div>
         <div className="card">
-          <div className="card-icon" style={{ color: s.vix_ratio != null && s.vix_ratio > 1 ? "var(--danger)" : "var(--success)" }}>
+          <div className="card-icon" style={{ color: s.vix_ratio != null && s.vix_ratio > 1 ? "var(--dash-negative)" : "var(--dash-positive)" }}>
             <ShieldAlert size={20} />
           </div>
           <div className="card-content">
             <span className="card-label">Term Structure</span>
             <span className="card-value" style={{
-              color: s.vix_ratio != null && s.vix_ratio > 1 ? "var(--danger)" : "var(--success)",
+              color: s.vix_ratio != null && s.vix_ratio > 1 ? "var(--dash-negative)" : "var(--dash-positive)",
             }}>
               {s.vix_ratio != null ? s.vix_ratio.toFixed(4) : "—"}
             </span>
@@ -479,8 +479,8 @@ export function VolatilityPage() {
               { type: "line", x0: 0, x1: 1, xref: "paper", y0: 50, y1: 50, line: { color: c.muted, width: 1, dash: "dot" } },
               { type: "line", x0: 0, x1: 1, xref: "paper", y0: 30, y1: 30, line: { color: c.green, width: 1.2, dash: "dash" } },
               { type: "line", x0: 0, x1: 1, xref: "paper", y0: 70, y1: 70, line: { color: c.red, width: 1.2, dash: "dash" } },
-              { type: "rect", x0: 0, x1: 1, xref: "paper", y0: 0, y1: 30, fillcolor: "rgba(0,200,100,0.06)", line: { width: 0 } },
-              { type: "rect", x0: 0, x1: 1, xref: "paper", y0: 70, y1: 100, fillcolor: "rgba(255,80,80,0.06)", line: { width: 0 } },
+              { type: "rect", x0: 0, x1: 1, xref: "paper", y0: 0, y1: 30, fillcolor: cssVar("--positive-fill-strong"), line: { width: 0 } },
+              { type: "rect", x0: 0, x1: 1, xref: "paper", y0: 70, y1: 100, fillcolor: cssVar("--negative-fill-strong"), line: { width: 0 } },
             ] as Plotly.Shape[],
             annotations: [
               { x: 0.005, xref: "paper", y: 15, yref: "y", text: "BUY ZONE", showarrow: false, font: { size: 10, color: c.green }, opacity: 0.5 },

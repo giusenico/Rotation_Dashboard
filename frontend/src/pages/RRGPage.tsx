@@ -207,10 +207,10 @@ export function RRGPage() {
     sortKey === key ? (sortAsc ? " \u25B2" : " \u25BC") : "";
 
   const quadrantColors: Record<string, string> = {
-    Leading: "var(--success)",
-    Weakening: "var(--warning)",
-    Lagging: "var(--danger)",
-    Improving: "var(--accent)",
+    Leading: "var(--dash-positive)",
+    Weakening: "var(--dash-negative)",
+    Lagging: "var(--dash-negative)",
+    Improving: "var(--dash-positive)",
   };
 
   if (isLoading) {

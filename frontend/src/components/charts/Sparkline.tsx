@@ -31,7 +31,7 @@ export function Sparkline({
 
   const isPositive = data[data.length - 1] >= data[0];
   const strokeColor =
-    color ?? (isPositive ? "var(--success)" : "var(--danger)");
+    color ?? (isPositive ? "var(--dash-positive)" : "var(--dash-negative)");
 
   return (
     <svg

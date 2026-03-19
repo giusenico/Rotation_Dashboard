@@ -18,11 +18,15 @@ type TickerGroups = {
   byCategory: TickerCategoryMap;
 };
 
+const TICKERS_CACHE = {
+  staleTime: 60 * 60 * 1000,
+  gcTime: 60 * 60 * 1000,
+};
+
 export function usePerformance(symbols = "all") {
   return useQuery({
     queryKey: ["performance", symbols],
     queryFn: () => fetchPerformance(symbols),
-    staleTime: 5 * 60 * 1000,
   });
 }
 
@@ -31,7 +35,6 @@ export function useDrawdown(symbol: string, startDate?: string, endDate?: string
     queryKey: ["drawdown", symbol, startDate, endDate],
     queryFn: () => fetchDrawdown(symbol, startDate, endDate),
     enabled: !!symbol,
-    staleTime: 5 * 60 * 1000,
   });
 }
 
@@ -40,7 +43,6 @@ export function useMultiPrices(symbols: string[], startDate?: string, endDate?: 
     queryKey: ["prices", "multi", symbols, startDate, endDate],
     queryFn: () => fetchMultiPrices(symbols, startDate, endDate),
     enabled: symbols.length > 0,
-    staleTime: 5 * 60 * 1000,
   });
 }
 
@@ -49,7 +51,6 @@ export function useCorrelation(symbols: string[], lookbackDays = 252) {
     queryKey: ["correlation", symbols, lookbackDays],
     queryFn: () => fetchCorrelation(symbols, lookbackDays),
     enabled: symbols.length >= 2,
-    staleTime: 5 * 60 * 1000,
   });
 }
 
@@ -57,7 +58,15 @@ export function useDashboardSummary() {
   return useQuery({
     queryKey: ["dashboard", "summary"],
     queryFn: fetchDashboardSummary,
-    staleTime: 5 * 60 * 1000,
+  });
+}
+
+/** Raw ticker list (shared cache with useTickers). */
+export function useTickersRaw() {
+  return useQuery({
+    queryKey: ["tickers"],
+    queryFn: () => fetchTickers(),
+    ...TICKERS_CACHE,
   });
 }
 
@@ -65,7 +74,7 @@ export function useTickers() {
   return useQuery({
     queryKey: ["tickers"],
     queryFn: () => fetchTickers(),
-    staleTime: 30 * 60 * 1000,
+    ...TICKERS_CACHE,
     select: (data: TickerInfo[]) => {
       const byCategory: TickerCategoryMap = {};
       const sectors = data.filter((t) => t.category === "Sector ETF").map((t) => t.symbol);

@@ -65,7 +65,7 @@ function ScoreBar({ value }: { value: number | null }) {
   if (value == null) return <span className="num-cell">—</span>;
   const absWidth = Math.abs(value) * 50;
   const isPositive = value >= 0;
-  const color = isPositive ? "var(--success)" : "var(--danger)";
+  const color = isPositive ? "var(--dash-positive)" : "var(--dash-negative)";
   const left = isPositive ? 50 : 50 - absWidth;
 
   return (
@@ -119,7 +119,7 @@ function OBVSummaryCards({ data }: { data: OBVStructureEntry[] }) {
   return (
     <div className="summary-cards" style={{ marginBottom: 20 }}>
       <div className="card">
-        <div className="card-icon" style={{ color: "var(--success)" }}>
+        <div className="card-icon" style={{ color: "var(--dash-positive)" }}>
           <Award size={20} />
         </div>
         <div className="card-content">
@@ -129,7 +129,7 @@ function OBVSummaryCards({ data }: { data: OBVStructureEntry[] }) {
         </div>
       </div>
       <div className="card">
-        <div className="card-icon" style={{ color: "var(--danger)" }}>
+        <div className="card-icon" style={{ color: "var(--dash-negative)" }}>
           <Award size={20} />
         </div>
         <div className="card-content">
@@ -611,7 +611,7 @@ export function FlowStructurePage() {
                             {delta != null && (
                               <span
                                 className="obv-delta"
-                                style={{ color: delta >= 0 ? "var(--success)" : "var(--danger)" }}
+                                style={{ color: delta >= 0 ? "var(--dash-positive)" : "var(--dash-negative)" }}
                               >
                                 {delta >= 0 ? "\u25B2" : "\u25BC"}
                               </span>

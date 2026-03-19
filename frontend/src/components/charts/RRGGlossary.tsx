@@ -39,19 +39,19 @@ function SectionContent({ section, variant, timeframe, rsSpan, momentumSpan }: {
               vs the benchmark{variant === "sector" ? " (S&P 500)" : ""}. Think of it as a traffic light for relative strength.
             </p>
             <dl className="glossary-term glossary-term--leading">
-              <dt style={{ color: "var(--success)" }}>Leading (top-right)</dt>
+              <dt style={{ color: "var(--dash-positive)" }}>Leading (top-right)</dt>
               <dd>Beating the market and still gaining strength. These are the strongest assets right now.</dd>
             </dl>
             <dl className="glossary-term glossary-term--weakening">
-              <dt style={{ color: "var(--warning)" }}>Weakening (bottom-right)</dt>
+              <dt style={{ color: "var(--dash-negative)" }}>Weakening (bottom-right)</dt>
               <dd>Still above average, but losing momentum. Could be the start of a decline — watch closely.</dd>
             </dl>
             <dl className="glossary-term glossary-term--lagging">
-              <dt style={{ color: "var(--danger)" }}>Lagging (bottom-left)</dt>
+              <dt style={{ color: "var(--dash-negative)" }}>Lagging (bottom-left)</dt>
               <dd>Below average and getting worse. The weakest assets — consider exiting or avoiding.</dd>
             </dl>
             <dl className="glossary-term glossary-term--improving">
-              <dt style={{ color: "var(--accent)" }}>Improving (top-left)</dt>
+              <dt style={{ color: "var(--dash-positive)" }}>Improving (top-left)</dt>
               <dd>Still below average, but picking up speed. Potential early entry candidates.</dd>
             </dl>
             <div className="glossary-tip">

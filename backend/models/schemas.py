@@ -249,3 +249,5 @@ class VolatilityDetailResponse(BaseModel):
     oscillator_series: list[VolatilityOscPoint]
     ratio_series: list[VolatilityRatioPoint]
     backtest_series: list[BacktestPoint]
+
+

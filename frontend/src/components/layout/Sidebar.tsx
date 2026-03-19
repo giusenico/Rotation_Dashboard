@@ -7,6 +7,7 @@ import {
   BarChart3,
   Gauge,
   Activity,
+  ArrowLeftRight,
 } from "lucide-react";
 
 const navGroups = [
@@ -37,6 +38,12 @@ const navGroups = [
     label: "Volatility",
     items: [
       { to: "/volatility", label: "VIX Structure", icon: Activity },
+    ],
+  },
+  {
+    label: "Compare",
+    items: [
+      { to: "/compare", label: "Asset Comparison", icon: ArrowLeftRight },
     ],
   },
   {
