@@ -240,7 +240,7 @@ function RSIGauge({ value, symbol, color }: { value: number | null; symbol: stri
 
 // ── Correlation Gauge (Swissblock-style horizontal bar) ──────────────
 
-function CorrelationGauge({ value, symA, symB }: { value: number; symA: string; symB: string }) {
+function CorrelationGauge({ value }: { value: number; symA: string; symB: string }) {
   const pct = Math.min(100, Math.max(0, ((value + 1) / 2) * 100));
   const col = value >= 0.7 ? V.pos : value <= 0.3 ? V.neg : V.neutral;
 
