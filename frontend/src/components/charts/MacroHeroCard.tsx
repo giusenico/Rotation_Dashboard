@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, lazy, Suspense } from "react";
 import { useMacroHero, useMacroHistory } from "../../hooks/useMacroData";
 import { formatDate } from "../../utils/formatters";
 import { cssVar } from "../../utils/cssVar";
@@ -7,7 +7,8 @@ import type {
   MacroRegime,
   MacroHistoryResponse,
 } from "../../types/macro";
-import Plot from "react-plotly.js";
+
+const Plot = lazy(() => import("react-plotly.js"));
 
 // ── Colors — all via CSS variables for theme consistency ─────────
 
@@ -276,46 +277,48 @@ function UnifiedSparkline({ history }: { history: MacroHistoryResponse }) {
   return (
     <div className="ms-sparkline-wrap">
       <div className="ms-section-title">Growth vs Safety ratio (6 months)</div>
-      <Plot
-        data={[
-          { x: dates, y: unified, type: "scatter", mode: "lines", name: "Ratio", line: { color: "#9899B3", width: 1.2 } },
-          { x: dates, y: maFast, type: "scatter", mode: "lines", name: "Short MA", line: { color: "#5A8FF7", width: 1, dash: "dot" } },
-          { x: dates, y: maSlow, type: "scatter", mode: "lines", name: "Long MA", line: { color: "#F09A92", width: 1, dash: "dot" } },
-        ]}
-        layout={{
-          autosize: true,
-          paper_bgcolor: "rgba(0,0,0,0)",
-          plot_bgcolor: "rgba(0,0,0,0)",
-          margin: { t: 4, r: 8, b: 24, l: 36 },
-          xaxis: {
-            color: textCol(),
-            gridcolor: gridCol(),
-            tickformat: "%b",
-            tickfont: { size: 9, color: textCol() },
-            nticks: 6,
-          },
-          yaxis: {
-            color: textCol(),
-            gridcolor: gridCol(),
-            type: "log" as const,
-            tickfont: { size: 9, color: textCol() },
-          },
-          showlegend: true,
-          legend: {
-            x: 1,
-            y: 1,
-            xanchor: "right" as const,
-            yanchor: "top" as const,
-            font: { size: 9, color: textCol() },
-            bgcolor: "rgba(0,0,0,0)",
-            orientation: "h" as const,
-            traceorder: "normal" as const,
-          },
-        }}
-        config={{ displayModeBar: false, responsive: true }}
-        useResizeHandler
-        style={{ width: "100%", height: "100%" }}
-      />
+      <Suspense fallback={<div className="ms-sparkline-placeholder" />}>
+        <Plot
+          data={[
+            { x: dates, y: unified, type: "scatter", mode: "lines", name: "Ratio", line: { color: "#9899B3", width: 1.2 } },
+            { x: dates, y: maFast, type: "scatter", mode: "lines", name: "Short MA", line: { color: "#5A8FF7", width: 1, dash: "dot" } },
+            { x: dates, y: maSlow, type: "scatter", mode: "lines", name: "Long MA", line: { color: "#F09A92", width: 1, dash: "dot" } },
+          ]}
+          layout={{
+            autosize: true,
+            paper_bgcolor: "rgba(0,0,0,0)",
+            plot_bgcolor: "rgba(0,0,0,0)",
+            margin: { t: 4, r: 8, b: 24, l: 36 },
+            xaxis: {
+              color: textCol(),
+              gridcolor: gridCol(),
+              tickformat: "%b",
+              tickfont: { size: 9, color: textCol() },
+              nticks: 6,
+            },
+            yaxis: {
+              color: textCol(),
+              gridcolor: gridCol(),
+              type: "log" as const,
+              tickfont: { size: 9, color: textCol() },
+            },
+            showlegend: true,
+            legend: {
+              x: 1,
+              y: 1,
+              xanchor: "right" as const,
+              yanchor: "top" as const,
+              font: { size: 9, color: textCol() },
+              bgcolor: "rgba(0,0,0,0)",
+              orientation: "h" as const,
+              traceorder: "normal" as const,
+            },
+          }}
+          config={{ displayModeBar: false, responsive: true }}
+          useResizeHandler
+          style={{ width: "100%", height: "100%" }}
+        />
+      </Suspense>
     </div>
   );
 }
