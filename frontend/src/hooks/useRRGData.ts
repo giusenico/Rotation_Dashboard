@@ -8,30 +8,34 @@ interface RRGParams {
   timeframe?: string;
 }
 
-export function useSectorRRG(params?: RRGParams) {
+export function useSectorRRG(params?: RRGParams, enabled: boolean = true) {
   return useQuery({
     queryKey: ["rrg", "sectors", params],
     queryFn: () => fetchSectorRRG(params),
+    enabled,
   });
 }
 
-export function useCrossAssetRRG(params?: RRGParams) {
+export function useCrossAssetRRG(params?: RRGParams, enabled: boolean = true) {
   return useQuery({
     queryKey: ["rrg", "cross-asset", params],
     queryFn: () => fetchCrossAssetRRG(params),
+    enabled,
   });
 }
 
-export function useSectorRankings(timeframe: string = "weekly") {
+export function useSectorRankings(timeframe: string = "weekly", enabled: boolean = true) {
   return useQuery({
     queryKey: ["rrg", "rankings", "sectors", timeframe],
     queryFn: () => fetchSectorRankings({ timeframe }),
+    enabled,
   });
 }
 
-export function useCrossAssetRankings(timeframe: string = "weekly") {
+export function useCrossAssetRankings(timeframe: string = "weekly", enabled: boolean = true) {
   return useQuery({
     queryKey: ["rrg", "rankings", "cross-asset", timeframe],
     queryFn: () => fetchCrossAssetRankings({ timeframe }),
+    enabled,
   });
 }

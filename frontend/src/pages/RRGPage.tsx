@@ -117,10 +117,11 @@ export function RRGPage() {
 
   const params = { trail_length: trailLength, rs_span: rsSpan, momentum_span: momentumSpan, timeframe };
 
-  const { data: sectorRRG, isLoading: slRRG } = useSectorRRG(params);
-  const { data: crossRRG, isLoading: clRRG } = useCrossAssetRRG(params);
-  const { data: sectorRankings } = useSectorRankings(timeframe);
-  const { data: crossRankings } = useCrossAssetRankings(timeframe);
+  const isSectors = tab === "sectors";
+  const { data: sectorRRG, isLoading: slRRG } = useSectorRRG(params, isSectors);
+  const { data: crossRRG, isLoading: clRRG } = useCrossAssetRRG(params, !isSectors);
+  const { data: sectorRankings } = useSectorRankings(timeframe, isSectors);
+  const { data: crossRankings } = useCrossAssetRankings(timeframe, !isSectors);
 
   const rrg = tab === "sectors" ? sectorRRG : crossRRG;
   const rankings = tab === "sectors" ? sectorRankings : crossRankings;
