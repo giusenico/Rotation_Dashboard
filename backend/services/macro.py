@@ -578,18 +578,70 @@ def _regime_duration_stats(regime_history: list[dict]) -> dict:
     }
 
 
+# ── DB read helper ─────────────────────────────────────────────────────
+
+def _read_from_db(conn, key: str):
+    """Read latest pre-computed result from macro_daily_cache."""
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                """SELECT value FROM macro_daily_cache
+                   WHERE key = %s
+                   ORDER BY date DESC LIMIT 1""",
+                (key,),
+            )
+            row = cur.fetchone()
+        if row is not None:
+            return row[0]  # psycopg2 returns JSONB as Python dict
+    except Exception as exc:
+        logger.warning("macro_daily_cache read failed for key=%s: %s", key, exc)
+    return None
+
+
 # ── Public API ───────────────────────────────────────────────────────
 
 def get_macro_hero(conn, period: int = DEFAULT_LOOKBACK) -> dict:
-    """
-    Main hero card endpoint: computes all notebook metrics.
-    Returns a single dict with the full snapshot.
-    """
+    """Read pre-computed hero from DB, fall back to on-the-fly computation."""
     cache_key = f"macro_hero_{period}"
     cached = _cache_get(cache_key)
     if cached is not None:
         return cached
 
+    # Try DB first
+    result = _read_from_db(conn, f"hero_{period}")
+    if result is not None:
+        _cache_set(cache_key, result)
+        return result
+
+    # Fallback: compute on-the-fly
+    result = _compute_macro_hero(conn, period)
+    _cache_set(cache_key, result)
+    return result
+
+
+def get_macro_history(conn, lookback: int = 300) -> dict:
+    """Read pre-computed history from DB, fall back to on-the-fly computation."""
+    cache_key = f"macro_history_{lookback}"
+    cached = _cache_get(cache_key)
+    if cached is not None:
+        return cached
+
+    # Try DB first
+    result = _read_from_db(conn, f"history_{lookback}")
+    if result is not None:
+        _cache_set(cache_key, result)
+        return result
+
+    # Fallback: compute on-the-fly
+    result = _compute_macro_history(conn, lookback)
+    _cache_set(cache_key, result)
+    return result
+
+
+# ── Computation (used by scripts/update_macro.py and as fallback) ────
+
+def _compute_macro_hero(conn, period: int = DEFAULT_LOOKBACK) -> dict:
+    """Compute all notebook metrics. Returns a single dict with the full snapshot."""
     prices = _fetch_adj_close(conn, MACRO_TICKERS)
     if prices.empty or len(prices) < SLOW_MA + Z_WIN:
         return {"error": "Insufficient data"}
@@ -689,20 +741,11 @@ def get_macro_hero(conn, period: int = DEFAULT_LOOKBACK) -> dict:
         "matrix": matrix_data,
     }
 
-    _cache_set(cache_key, result)
     return result
 
 
-def get_macro_history(conn, lookback: int = 300) -> dict:
-    """
-    Time-series data for detailed charts.
-    Returns unified ratio series, z-score, rotation metrics over time.
-    """
-    cache_key = f"macro_history_{lookback}"
-    cached = _cache_get(cache_key)
-    if cached is not None:
-        return cached
-
+def _compute_macro_history(conn, lookback: int = 300) -> dict:
+    """Compute time-series data for detailed charts."""
     prices = _fetch_adj_close(conn, MACRO_TICKERS)
     if prices.empty or len(prices) < SLOW_MA + Z_WIN:
         return {"error": "Insufficient data"}
@@ -773,5 +816,4 @@ def get_macro_history(conn, lookback: int = 300) -> dict:
         "as_of_date": prices.index[-1].strftime("%Y-%m-%d"),
     }
 
-    _cache_set(cache_key, result)
     return result

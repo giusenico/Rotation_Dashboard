@@ -60,3 +60,11 @@ CREATE TABLE IF NOT EXISTS obv_daily_metrics (
     rotation_score  REAL,               -- composite score [-1, +1]
     PRIMARY KEY (date, symbol)
 );
+
+-- Macro Risk-On/Off pre-computed results (JSONB blobs)
+CREATE TABLE IF NOT EXISTS macro_daily_cache (
+    date    TEXT    NOT NULL,   -- ISO-8601 (YYYY-MM-DD)
+    key     TEXT    NOT NULL,   -- e.g. 'hero_7', 'hero_14', 'history_300'
+    value   JSONB   NOT NULL,  -- full API response payload
+    PRIMARY KEY (date, key)
+);
