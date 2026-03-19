@@ -1,14 +1,11 @@
-import { useState, lazy, Suspense } from "react";
+import { useState, useMemo } from "react";
 import { useMacroHero, useMacroHistory } from "../../hooks/useMacroData";
 import { formatDate } from "../../utils/formatters";
-import { cssVar } from "../../utils/cssVar";
 import type {
   MacroHeroResponse,
   MacroRegime,
   MacroHistoryResponse,
 } from "../../types/macro";
-
-const Plot = lazy(() => import("react-plotly.js"));
 
 // ── Colors — all via CSS variables for theme consistency ─────────
 
@@ -262,63 +259,101 @@ function ScenariosSection({ hero }: { hero: MacroHeroResponse }) {
   );
 }
 
-// ── Compact Unified Ratio sparkline (always visible) ─────────────
+// ── Compact Unified Ratio sparkline (SVG — no Plotly dependency) ──
 
 function UnifiedSparkline({ history }: { history: MacroHistoryResponse }) {
-  const last120 = history.unified_series.slice(-120);
-  const dates = last120.map((p) => p.date);
-  const unified = last120.map((p) => p.unified);
-  const maFast = last120.map((p) => p.ma_fast);
-  const maSlow = last120.map((p) => p.ma_slow);
+  const W = 500;
+  const H = 120;
+  const PAD = { top: 4, right: 8, bottom: 20, left: 36 };
 
-  const textCol = () => cssVar("--chart-text");
-  const gridCol = () => cssVar("--chart-grid");
+  const paths = useMemo(() => {
+    const last120 = history.unified_series.slice(-120);
+    if (last120.length < 2) return null;
+
+    const unified = last120.map((p) => p.unified).filter((v): v is number => v != null);
+    const maFast = last120.map((p) => p.ma_fast).filter((v): v is number => v != null);
+    const maSlow = last120.map((p) => p.ma_slow).filter((v): v is number => v != null);
+    const dates = last120.map((p) => p.date);
+
+    // Use log scale like the original Plotly chart
+    const allVals = [...unified, ...maFast, ...maSlow].filter((v) => v > 0);
+    if (allVals.length === 0) return null;
+    const logMin = Math.log(Math.min(...allVals));
+    const logMax = Math.log(Math.max(...allVals));
+    const logRange = logMax - logMin || 1;
+
+    const plotW = W - PAD.left - PAD.right;
+    const plotH = H - PAD.top - PAD.bottom;
+
+    const toPath = (vals: number[]) => {
+      const step = plotW / (vals.length - 1);
+      return vals
+        .map((v, i) => {
+          const x = PAD.left + i * step;
+          const y = PAD.top + plotH - ((Math.log(v) - logMin) / logRange) * plotH;
+          return `${i === 0 ? "M" : "L"}${x.toFixed(1)},${y.toFixed(1)}`;
+        })
+        .join("");
+    };
+
+    // X-axis month labels
+    const months: { x: number; label: string }[] = [];
+    let lastMonth = -1;
+    const step = plotW / (dates.length - 1);
+    for (let i = 0; i < dates.length; i++) {
+      const d = new Date(dates[i]);
+      const m = d.getMonth();
+      if (m !== lastMonth) {
+        lastMonth = m;
+        months.push({
+          x: PAD.left + i * step,
+          label: d.toLocaleString("en", { month: "short" }),
+        });
+      }
+    }
+
+    return {
+      unified: toPath(unified),
+      maFast: maFast.length >= 2 ? toPath(maFast) : null,
+      maSlow: maSlow.length >= 2 ? toPath(maSlow) : null,
+      months,
+    };
+  }, [history]);
+
+  if (!paths) return null;
 
   return (
     <div className="ms-sparkline-wrap">
       <div className="ms-section-title">Growth vs Safety ratio (6 months)</div>
-      <Suspense fallback={<div className="ms-sparkline-placeholder" />}>
-        <Plot
-          data={[
-            { x: dates, y: unified, type: "scatter", mode: "lines", name: "Ratio", line: { color: "#9899B3", width: 1.2 } },
-            { x: dates, y: maFast, type: "scatter", mode: "lines", name: "Short MA", line: { color: "#5A8FF7", width: 1, dash: "dot" } },
-            { x: dates, y: maSlow, type: "scatter", mode: "lines", name: "Long MA", line: { color: "#F09A92", width: 1, dash: "dot" } },
-          ]}
-          layout={{
-            autosize: true,
-            paper_bgcolor: "rgba(0,0,0,0)",
-            plot_bgcolor: "rgba(0,0,0,0)",
-            margin: { t: 4, r: 8, b: 24, l: 36 },
-            xaxis: {
-              color: textCol(),
-              gridcolor: gridCol(),
-              tickformat: "%b",
-              tickfont: { size: 9, color: textCol() },
-              nticks: 6,
-            },
-            yaxis: {
-              color: textCol(),
-              gridcolor: gridCol(),
-              type: "log" as const,
-              tickfont: { size: 9, color: textCol() },
-            },
-            showlegend: true,
-            legend: {
-              x: 1,
-              y: 1,
-              xanchor: "right" as const,
-              yanchor: "top" as const,
-              font: { size: 9, color: textCol() },
-              bgcolor: "rgba(0,0,0,0)",
-              orientation: "h" as const,
-              traceorder: "normal" as const,
-            },
-          }}
-          config={{ displayModeBar: false, responsive: true }}
-          useResizeHandler
-          style={{ width: "100%", height: "100%" }}
+      <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: "100%" }} preserveAspectRatio="none">
+        {/* Grid line at midpoint */}
+        <line
+          x1={PAD.left} x2={W - PAD.right}
+          y1={(H - PAD.bottom + PAD.top) / 2}
+          y2={(H - PAD.bottom + PAD.top) / 2}
+          stroke="var(--chart-grid, #333)" strokeWidth="0.5" strokeDasharray="4,4"
         />
-      </Suspense>
+        {/* Lines */}
+        <path d={paths.unified} fill="none" stroke="#9899B3" strokeWidth="1.5" vectorEffect="non-scaling-stroke" />
+        {paths.maFast && (
+          <path d={paths.maFast} fill="none" stroke="#5A8FF7" strokeWidth="1" strokeDasharray="3,3" vectorEffect="non-scaling-stroke" />
+        )}
+        {paths.maSlow && (
+          <path d={paths.maSlow} fill="none" stroke="#F09A92" strokeWidth="1" strokeDasharray="3,3" vectorEffect="non-scaling-stroke" />
+        )}
+        {/* X-axis month labels */}
+        {paths.months.map((m) => (
+          <text key={m.label + m.x} x={m.x} y={H - 4} fill="var(--chart-text, #888)" fontSize="9" textAnchor="middle">
+            {m.label}
+          </text>
+        ))}
+      </svg>
+      {/* Legend */}
+      <div className="ms-sparkline-legend">
+        <span><span className="ms-legend-line" style={{ background: "#9899B3" }} /> Ratio</span>
+        <span><span className="ms-legend-line ms-legend-line--dashed" style={{ background: "#5A8FF7" }} /> Short MA</span>
+        <span><span className="ms-legend-line ms-legend-line--dashed" style={{ background: "#F09A92" }} /> Long MA</span>
+      </div>
     </div>
   );
 }
