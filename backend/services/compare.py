@@ -369,6 +369,34 @@ def _compute_regime_simple(df: pd.DataFrame, sma_len: int = 50) -> dict:
     return result
 
 
+# ── Result reordering (for cache hits with different symbol order) ────
+
+def _reorder_result(result: dict, symbols: list[str]) -> dict:
+    """Return a copy of the cached result reordered to match `symbols`."""
+    cached_symbols = result["symbols"]
+    # Build index map: new position -> old position
+    idx_map = {sym: i for i, sym in enumerate(cached_symbols)}
+
+    reordered = {**result, "symbols": symbols}
+
+    # Reorder assets list
+    reordered["assets"] = [result["assets"][idx_map[s]] for s in symbols]
+
+    # Swap relative_strength direction if the pair order flipped
+    if len(symbols) >= 2 and symbols[0] != cached_symbols[0]:
+        rs = result.get("relative_strength")
+        if rs and rs.get("values"):
+            reordered["relative_strength"] = {
+                **rs,
+                "values": [1.0 / v if v else v for v in rs["values"]],
+            }
+        rc = result.get("rolling_correlation")
+        if rc:
+            reordered["rolling_correlation"] = rc  # correlation is symmetric
+
+    return reordered
+
+
 # ── Main entry point ─────────────────────────────────────────────────
 
 def get_comparison(conn, symbols: list[str], lookback: int = DEFAULT_LOOKBACK) -> dict:
@@ -376,6 +404,9 @@ def get_comparison(conn, symbols: list[str], lookback: int = DEFAULT_LOOKBACK) -
     cache_key = f"compare:{'|'.join(sorted(symbols))}:{lookback}"
     cached = _cache_get(cache_key)
     if cached is not None:
+        # Reorder result to match requested symbol order (cache key is sorted)
+        if cached.get("symbols") != symbols:
+            return _reorder_result(cached, symbols)
         return cached
 
     try:

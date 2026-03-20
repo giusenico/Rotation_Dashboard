@@ -212,7 +212,7 @@ a:hover {
 /* ── Header ───────────────────────────────────────────────────── */
 .header {
   display: grid;
-  grid-template-columns: auto 1fr auto;
+  grid-template-columns: 1fr auto 1fr;
   align-items: center;
   padding: 12px 24px;
   border-bottom: 1px solid var(--glass-border);
@@ -301,6 +301,7 @@ a:hover {
 .header-right {
   display: flex;
   align-items: center;
+  justify-content: flex-end;
   gap: 12px;
 }
 .header-data-date {
@@ -556,6 +557,7 @@ a:hover {
 
 .dashboard-page {
   max-width: 1600px;
+  margin: 0 auto;
   height: 100%;
   display: grid;
   grid-template-columns: 2fr 3fr;
@@ -3403,6 +3405,9 @@ a:hover {
 }
 
 .compare-page {
+  max-width: 1600px;
+  margin: 0 auto;
+  width: 100%;
   display: flex;
   flex-direction: column;
   gap: 12px;
