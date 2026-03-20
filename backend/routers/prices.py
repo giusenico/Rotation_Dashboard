@@ -92,12 +92,25 @@ def dashboard_summary(conn=Depends(get_db)):
     sp500_perf = compute_performance(conn, ["^GSPC"])
     sp500_ytd = sp500_perf[0].get("return_ytd") if sp500_perf else None
 
+    # S&P 500 sparkline — last 30 trading days of adj_close
+    sp500_sparkline: list[float] = []
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT adj_close FROM daily_prices WHERE symbol = %s ORDER BY date DESC LIMIT 30",
+                ("^GSPC",),
+            )
+            sp500_sparkline = [row[0] for row in cur.fetchall()][::-1]
+    except Exception:
+        pass
+
     return {
         "total_tickers": len(tickers),
         "latest_date": latest_date,
         "sector_leader": sector_leader,
         "cross_asset_leader": cross_asset_leader,
         "sp500_return_ytd": sp500_ytd,
+        "sp500_sparkline": sp500_sparkline,
     }
 
 

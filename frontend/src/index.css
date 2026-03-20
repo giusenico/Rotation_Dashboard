@@ -254,6 +254,7 @@ a:hover {
   border-radius: 12px;
   background: var(--bg-tertiary);
   border: 1px solid var(--glass-border);
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.12);
   justify-self: center;
   position: relative;
 }
@@ -265,7 +266,7 @@ a:hover {
   height: calc(100% - 8px);
   border-radius: 9px;
   background: var(--accent);
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.25);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(255, 255, 255, 0.08) inset;
   pointer-events: none;
   opacity: 0;
   will-change: left, width, border-radius;
@@ -282,19 +283,23 @@ a:hover {
   font-size: 12px;
   font-weight: 700;
   letter-spacing: 1px;
-  color: var(--text-muted);
+  color: var(--text-secondary);
   text-decoration: none;
-  transition: color 0.3s ease;
+  transition: color 0.3s ease, opacity 0.3s ease;
   white-space: nowrap;
+  opacity: 0.65;
 }
 .header-tab:hover {
   color: var(--text-primary);
+  opacity: 0.85;
 }
 .header-tab--active {
   color: #fff;
+  opacity: 1;
 }
 .header-tab--active:hover {
   color: #fff;
+  opacity: 1;
 }
 
 /* ── Header right group (date + theme toggle) ────────────────── */
@@ -607,6 +612,7 @@ a:hover {
 }
 .card--compact .card-icon { width: 26px; height: 26px; }
 .card--compact .card-label { font-size: 10px; margin-bottom: 1px; }
+.card-value-row { display: flex; align-items: center; gap: 8px; }
 .card--compact .dash-breadth-nums { font-size: 11px; gap: 6px; }
 
 /* Rotation panels row */
@@ -1698,15 +1704,51 @@ a:hover {
 }
 
 .obv-lb-name {
-  flex: 1;
   color: var(--text-secondary);
   font-size: 12px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  flex-shrink: 1;
+}
+/* When no leader-dots sibling, name takes remaining space */
+.obv-lb-name:last-of-type:not(:has(~ .obv-lb-leader-dots)) {
+  flex: 1;
+}
+.obv-leaderboard-row:not(:has(.obv-lb-leader-dots)) .obv-lb-name {
+  flex: 1;
+}
+
+.obv-lb-leader-dots {
+  flex: 1;
+  border-bottom: 1px dotted var(--border);
+  min-width: 8px;
+  align-self: baseline;
+  margin-bottom: 3px;
+}
+
+.obv-lb-score-cell {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  min-width: 52px;
+  height: 18px;
+  flex-shrink: 0;
+}
+
+.obv-lb-score-bar {
+  position: absolute;
+  right: 0;
+  top: 0;
+  height: 100%;
+  border-radius: 3px;
+  opacity: 0.15;
+  transition: width 0.4s ease;
 }
 
 .obv-lb-score {
+  position: relative;
   font-family: "JetBrains Mono", "SF Mono", "Fira Code", monospace;
   font-size: 12px;
   font-weight: 700;
@@ -3147,14 +3189,15 @@ a:hover {
 
 .ms-mini-dot {
   position: absolute;
-  top: -3px;
-  width: 11px;
-  height: 11px;
-  border-radius: 50%;
-  background: var(--bg-card);
-  border: 2.5px solid;
+  top: -4px;
+  width: 3px;
+  height: 13px;
+  border-radius: 1.5px;
+  background: currentColor;
+  border: none;
   transform: translateX(-50%);
   transition: left 0.5s ease;
+  box-shadow: 0 0 4px rgba(0, 0, 0, 0.3);
 }
 
 .ms-mini-labels {
@@ -3194,8 +3237,9 @@ a:hover {
 .ms-scenario-header {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 6px;
-  margin-bottom: 2px;
+  margin-bottom: 3px;
 }
 
 .ms-scenario-badge {
@@ -3211,16 +3255,17 @@ a:hover {
 }
 
 .ms-scenario-bar-wrap {
-  flex: 1;
-  height: 6px;
-  border-radius: 3px;
+  width: 100%;
+  height: 4px;
+  border-radius: 2px;
   background: rgba(255, 255, 255, 0.06);
   overflow: hidden;
+  margin-bottom: 3px;
 }
 
 .ms-scenario-bar {
   height: 100%;
-  border-radius: 3px;
+  border-radius: 2px;
   transition: width 0.5s ease;
 }
 

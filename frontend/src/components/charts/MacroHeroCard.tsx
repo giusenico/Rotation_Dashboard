@@ -147,7 +147,7 @@ function MiniGauge({
       </div>
       <div className="ms-mini-track">
         <div className="ms-mini-fill" style={{ width: `${pct}%`, background: color }} />
-        <div className="ms-mini-dot" style={{ left: `${pct}%`, borderColor: color }} />
+        <div className="ms-mini-dot" style={{ left: `${pct}%`, color }} />
       </div>
       <div className="ms-mini-labels">
         <span>{leftLabel}</span>
@@ -249,10 +249,10 @@ function ScenariosSection({ hero }: { hero: MacroHeroResponse }) {
             <span className="ms-scenario-badge" style={{ color: s.color, background: s.bgColor }}>
               {s.label}
             </span>
-            <div className="ms-scenario-bar-wrap">
-              <div className="ms-scenario-bar" style={{ width: `${s.probability}%`, background: s.color }} />
-            </div>
             <span className="ms-scenario-pct" style={{ color: s.color }}>{s.probability}%</span>
+          </div>
+          <div className="ms-scenario-bar-wrap">
+            <div className="ms-scenario-bar" style={{ width: `${s.probability}%`, background: s.color }} />
           </div>
           <div className="ms-scenario-details">
             <div className="ms-scenario-row">
@@ -287,9 +287,9 @@ function UnifiedSparkline({ history }: { history: MacroHistoryResponse }) {
       <div className="ms-section-title">Growth vs Safety ratio (6 months)</div>
       <Plot
         data={[
-          { x: dates, y: unified, type: "scatter", mode: "lines", name: "Ratio", line: { color: "#9899B3", width: 1.2 } },
-          { x: dates, y: maFast, type: "scatter", mode: "lines", name: "Short MA", line: { color: "#5A8FF7", width: 1, dash: "dot" } },
-          { x: dates, y: maSlow, type: "scatter", mode: "lines", name: "Long MA", line: { color: "#F09A92", width: 1, dash: "dot" } },
+          { x: dates, y: unified, type: "scatter", mode: "lines", name: "Ratio", line: { color: "#9899B3", width: 2 }, hovertemplate: "%{x|%b %d}: %{y:.2f}<extra>Ratio</extra>" },
+          { x: dates, y: maFast, type: "scatter", mode: "lines", name: "Short MA", line: { color: "#5A8FF7", width: 2, dash: "dot" }, hovertemplate: "%{x|%b %d}: %{y:.2f}<extra>Short MA</extra>" },
+          { x: dates, y: maSlow, type: "scatter", mode: "lines", name: "Long MA", line: { color: "#F09A92", width: 2, dash: "dot" }, hovertemplate: "%{x|%b %d}: %{y:.2f}<extra>Long MA</extra>" },
         ]}
         layout={{
           autosize: true,
@@ -308,6 +308,7 @@ function UnifiedSparkline({ history }: { history: MacroHistoryResponse }) {
             gridcolor: gridCol(),
             type: "log" as const,
             tickfont: { size: 9, color: textCol() },
+            title: { text: "Growth / Safety", font: { size: 9, color: textCol() }, standoff: 4 },
           },
           showlegend: true,
           legend: {

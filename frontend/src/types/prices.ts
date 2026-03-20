@@ -56,4 +56,5 @@ export interface DashboardSummary {
   sector_leader: import("./rrg").RankingEntry | null;
   cross_asset_leader: import("./rrg").RankingEntry | null;
   sp500_return_ytd: number | null;
+  sp500_sparkline: number[];
 }

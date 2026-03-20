@@ -159,6 +159,7 @@ class DashboardSummary(BaseModel):
     sector_leader: RankingEntry | None = None
     cross_asset_leader: RankingEntry | None = None
     sp500_return_ytd: float | None = None
+    sp500_sparkline: list[float] = []
 
 
 # ── Market Regime ───────────────────────────────────────────────────

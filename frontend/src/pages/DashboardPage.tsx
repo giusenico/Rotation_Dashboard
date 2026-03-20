@@ -11,14 +11,34 @@ import type { RegimeSummaryEntry } from "../types/regime";
 import type { OBVStructureEntry } from "../types/flow";
 import type { LucideProps } from "lucide-react";
 import {
-  TrendingUp,
-  TrendingDown,
   Radar,
   Globe,
   Gauge,
   Activity,
   Zap,
 } from "lucide-react";
+
+// ── Tiny SVG sparkline ──────────────────────────────────────────────
+
+function MiniSparkline({ data, color, width = 60, height = 22 }: { data: number[]; color: string; width?: number; height?: number }) {
+  if (!data || data.length < 2) return null;
+  const min = Math.min(...data);
+  const max = Math.max(...data);
+  const range = max - min || 1;
+  const points = data
+    .map((v, i) => {
+      const x = (i / (data.length - 1)) * width;
+      const y = height - ((v - min) / range) * height;
+      return `${x},${y}`;
+    })
+    .join(" ");
+
+  return (
+    <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} style={{ display: "block", flexShrink: 0 }}>
+      <polyline points={points} fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
 
 // ── All colors via CSS variables (shared with hero card) ─────────
 const V = {
@@ -184,7 +204,11 @@ function FlowLeadersCompact({ data }: { data: OBVStructureEntry[] }) {
               <span className="obv-lb-rank">{i + 1}</span>
               <span className="ticker-cell">{entry.symbol}</span>
               <span className="obv-lb-name">{entry.asset}</span>
-              <span className="obv-lb-score" style={{ color: V.pos }}>{entry.rotation_score?.toFixed(3) ?? "—"}</span>
+              <span className="obv-lb-leader-dots" />
+              <span className="obv-lb-score-cell">
+                <span className="obv-lb-score-bar" style={{ width: `${Math.min(100, Math.abs(entry.rotation_score ?? 0) * 100)}%`, background: V.pos }} />
+                <span className="obv-lb-score" style={{ color: V.pos }}>{entry.rotation_score?.toFixed(3) ?? "—"}</span>
+              </span>
             </div>
           ))}
         </div>
@@ -195,7 +219,11 @@ function FlowLeadersCompact({ data }: { data: OBVStructureEntry[] }) {
               <span className="obv-lb-rank">{i + 1}</span>
               <span className="ticker-cell">{entry.symbol}</span>
               <span className="obv-lb-name">{entry.asset}</span>
-              <span className="obv-lb-score" style={{ color: V.neg }}>{entry.rotation_score?.toFixed(3) ?? "—"}</span>
+              <span className="obv-lb-leader-dots" />
+              <span className="obv-lb-score-cell">
+                <span className="obv-lb-score-bar" style={{ width: `${Math.min(100, Math.abs(entry.rotation_score ?? 0) * 100)}%`, background: V.neg }} />
+                <span className="obv-lb-score" style={{ color: V.neg }}>{entry.rotation_score?.toFixed(3) ?? "—"}</span>
+              </span>
             </div>
           ))}
         </div>
@@ -242,21 +270,25 @@ export function DashboardPage() {
         {/* Row 1: Stat cards (show skeleton while loading) */}
         <div className="dash-stat-row">
           <div className="card card--compact">
-            <div className="card-icon" style={{ color: spPositive ? V.pos : V.neg, opacity: 1 }}>
-              {spPositive ? <TrendingUp size={18} /> : <TrendingDown size={18} />}
-            </div>
             <div className="card-content">
               <span className="card-label">S&P 500 YTD</span>
-              {summaryLoading ? (
-                <span className="card-value card-value--sm dash-skeleton">&nbsp;</span>
-              ) : (
-                <span
-                  className="card-value card-value--sm"
-                  style={{ color: spPositive ? V.pos : V.neg }}
-                >
-                  {formatPct(summary?.sp500_return_ytd)}
-                </span>
-              )}
+              <div className="card-value-row">
+                {summaryLoading ? (
+                  <span className="card-value card-value--sm dash-skeleton">&nbsp;</span>
+                ) : (
+                  <>
+                    <span
+                      className="card-value card-value--sm"
+                      style={{ color: spPositive ? V.pos : V.neg }}
+                    >
+                      {formatPct(summary?.sp500_return_ytd)}
+                    </span>
+                    {summary?.sp500_sparkline && summary.sp500_sparkline.length > 1 && (
+                      <MiniSparkline data={summary.sp500_sparkline} color={spPositive ? "var(--dash-positive)" : "var(--dash-negative)"} />
+                    )}
+                  </>
+                )}
+              </div>
             </div>
           </div>
 
