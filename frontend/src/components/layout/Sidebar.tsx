@@ -7,7 +7,6 @@ import {
   BarChart3,
   Gauge,
   Activity,
-  ArrowLeftRight,
 } from "lucide-react";
 
 const navGroups = [
@@ -41,20 +40,14 @@ const navGroups = [
     ],
   },
   {
-    label: "Compare",
-    items: [
-      { to: "/compare", label: "Asset Comparison", icon: ArrowLeftRight },
-    ],
-  },
-  {
     label: "Data",
     items: [{ to: "/prices", label: "Price Explorer", icon: LineChart }],
   },
 ];
 
-export function Sidebar() {
+export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
   return (
-    <aside className="sidebar">
+    <aside className={`sidebar ${open ? "sidebar--open" : ""}`}>
       <div className="sidebar-brand">
         <Radar size={24} />
         <span>Rotation Dashboard</span>
@@ -73,6 +66,7 @@ export function Sidebar() {
                 className={({ isActive }) =>
                   `sidebar-link ${isActive ? "sidebar-link--active" : ""}`
                 }
+                onClick={onClose}
               >
                 <item.icon size={18} />
                 <span>{item.label}</span>

@@ -3,6 +3,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from backend.database import get_db
+from backend.utils.params import normalize_symbol, parse_symbol_list
 from backend.models.schemas import (
     OBVDetailResponse,
     OBVScoreHistoryEntry,
@@ -27,7 +28,7 @@ def obv_score_history(
     lookback: int = Query(252, ge=21, le=9999, description="Trading days of history"),
     conn=Depends(get_db),
 ):
-    sym_list = [s.strip().upper() for s in symbols.split(",")] if symbols else None
+    sym_list = parse_symbol_list(symbols) if symbols is not None else None
     return get_obv_score_history(conn, symbols=sym_list, lookback_days=lookback)
 
 
@@ -38,7 +39,9 @@ def obv_detail(
     timeframe: str = Query("daily", pattern="^(daily|4h|weekly)$"),
     conn=Depends(get_db),
 ):
-    symbol = symbol.upper()
+    symbol = normalize_symbol(symbol)
+    if not symbol:
+        raise HTTPException(status_code=400, detail="Symbol is required")
     result = get_obv_detail(conn, symbol=symbol, lookback_bars=lookback, timeframe=timeframe)
     if result is None:
         raise HTTPException(status_code=404, detail=f"Symbol '{symbol}' not found in OBV universe")

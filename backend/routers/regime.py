@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from backend.database import get_db
 from backend.models.schemas import RegimeDetailResponse, RegimeSummaryEntry
 from backend.services.regime import get_regime_detail, get_regime_summary
+from backend.utils.params import normalize_symbol
 
 router = APIRouter()
 
@@ -26,7 +27,9 @@ def regime_detail(
     overext_mode: str = Query("Z", pattern="^(Z|pct|ATR)$"),
     conn=Depends(get_db),
 ):
-    symbol = symbol.upper()
+    symbol = normalize_symbol(symbol)
+    if not symbol:
+        raise HTTPException(status_code=400, detail="Symbol is required")
     result = get_regime_detail(
         conn,
         symbol=symbol,

@@ -72,6 +72,16 @@ const SIGNAL_LABELS: Record<string, string> = {
   "Z-Turn Down": "Pullback from overbought levels",
 };
 
+function hasMacroHistory(value: unknown): value is MacroHistoryResponse {
+  if (!value || typeof value !== "object") return false;
+  const candidate = value as Record<string, unknown>;
+  return (
+    Array.isArray(candidate.unified_series) &&
+    Array.isArray(candidate.rotation_series) &&
+    Array.isArray(candidate.regime_history)
+  );
+}
+
 // ── Gradient gauge ───────────────────────────────────────────────
 
 function SegmentGauge({ score, regime }: { score: number; regime: MacroRegime }) {
@@ -326,6 +336,7 @@ export function MacroHeroCard() {
   const [period, setPeriod] = useState(7);
   const { data, isLoading } = useMacroHero(period);
   const { data: history } = useMacroHistory(300);
+  const showHistory = hasMacroHistory(history);
 
   if (isLoading || !data) {
     return (
@@ -444,7 +455,7 @@ export function MacroHeroCard() {
       )}
 
       {/* Sparkline chart */}
-      {history && <UnifiedSparkline history={history} />}
+      {showHistory && <UnifiedSparkline history={history} />}
 
       {/* Footer */}
       <div className="ms-footer">

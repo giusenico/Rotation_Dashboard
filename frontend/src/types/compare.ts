@@ -30,7 +30,20 @@ export interface CompareCorrelation {
   matrix: number[][];
 }
 
-export interface CompareResponse {
+export interface RRGTrailPoint {
+  date: string;
+  ratio: number;
+  momentum: number;
+}
+
+export interface RRGPosition {
+  ratio: number;
+  momentum: number;
+  quadrant: string;
+  trail: RRGTrailPoint[];
+}
+
+export interface ComparePayload {
   symbols: string[];
   lookback: number;
   as_of_date: string | null;
@@ -41,4 +54,7 @@ export interface CompareResponse {
   rsi: Record<string, CompareRSI>;
   volume: Record<string, CompareTimeSeries>;
   relative_strength: CompareTimeSeries;
+  rrg_positions: Record<string, RRGPosition>;
 }
+
+export type CompareResponse = ComparePayload | { error: string };

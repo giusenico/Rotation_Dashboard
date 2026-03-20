@@ -602,40 +602,48 @@ def _read_from_db(conn, key: str):
 
 def get_macro_hero(conn, period: int = DEFAULT_LOOKBACK) -> dict:
     """Read pre-computed hero from DB, fall back to on-the-fly computation."""
-    cache_key = f"macro_hero_{period}"
-    cached = _cache_get(cache_key)
-    if cached is not None:
-        return cached
+    try:
+        cache_key = f"macro_hero_{period}"
+        cached = _cache_get(cache_key)
+        if cached is not None:
+            return cached
 
-    # Try DB first
-    result = _read_from_db(conn, f"hero_{period}")
-    if result is not None:
+        # Try DB first
+        result = _read_from_db(conn, f"hero_{period}")
+        if result is not None:
+            _cache_set(cache_key, result)
+            return result
+
+        # Fallback: compute on-the-fly
+        result = _compute_macro_hero(conn, period)
         _cache_set(cache_key, result)
         return result
-
-    # Fallback: compute on-the-fly
-    result = _compute_macro_hero(conn, period)
-    _cache_set(cache_key, result)
-    return result
+    except Exception:
+        logger.exception("Failed to build macro hero for period=%d", period)
+        return {"error": "Macro hero temporarily unavailable"}
 
 
 def get_macro_history(conn, lookback: int = 300) -> dict:
     """Read pre-computed history from DB, fall back to on-the-fly computation."""
-    cache_key = f"macro_history_{lookback}"
-    cached = _cache_get(cache_key)
-    if cached is not None:
-        return cached
+    try:
+        cache_key = f"macro_history_{lookback}"
+        cached = _cache_get(cache_key)
+        if cached is not None:
+            return cached
 
-    # Try DB first
-    result = _read_from_db(conn, f"history_{lookback}")
-    if result is not None:
+        # Try DB first
+        result = _read_from_db(conn, f"history_{lookback}")
+        if result is not None:
+            _cache_set(cache_key, result)
+            return result
+
+        # Fallback: compute on-the-fly
+        result = _compute_macro_history(conn, lookback)
         _cache_set(cache_key, result)
         return result
-
-    # Fallback: compute on-the-fly
-    result = _compute_macro_history(conn, lookback)
-    _cache_set(cache_key, result)
-    return result
+    except Exception:
+        logger.exception("Failed to build macro history for lookback=%d", lookback)
+        return {"error": "Macro history temporarily unavailable"}
 
 
 # ── Computation (used by scripts/update_macro.py and as fallback) ────

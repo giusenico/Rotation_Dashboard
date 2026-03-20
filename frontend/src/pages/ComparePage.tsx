@@ -5,7 +5,7 @@ import { useTickersRaw } from "../hooks/usePriceData";
 import { LoadingSpinner } from "../components/common/LoadingSpinner";
 import { cssVar } from "../utils/cssVar";
 import { formatPct, formatDate } from "../utils/formatters";
-import type { CompareAssetInfo } from "../types/compare";
+import type { CompareAssetInfo, ComparePayload, RRGPosition } from "../types/compare";
 import { ArrowLeftRight, TrendingUp, TrendingDown, ChevronDown } from "lucide-react";
 
 // ── Palette ──────────────────────────────────────────────────────────
@@ -29,16 +29,36 @@ const LOOKBACK_OPTIONS = [
   { label: "5Y", value: 1260 },
 ];
 
-const SUB_CHART_TABS = [
-  { key: "rel-strength", label: "Relative Strength" },
-  { key: "correlation", label: "Correlation" },
-  { key: "volume", label: "Volume" },
-  { key: "rsi", label: "RSI" },
-] as const;
+const QUADRANT_COLORS: Record<string, string> = {
+  Leading: "var(--dash-positive)",
+  Weakening: "#F0A040",
+  Lagging: "var(--dash-negative)",
+  Improving: "#5A8FF7",
+};
 
-type SubChartTab = (typeof SUB_CHART_TABS)[number]["key"];
+const QUADRANT_BG: Record<string, string> = {
+  Leading: "var(--dash-positive-bg)",
+  Weakening: "rgba(240,160,64,0.12)",
+  Lagging: "var(--dash-negative-bg)",
+  Improving: "rgba(90,143,247,0.12)",
+};
 
 const DEFAULT_PAIR = ["SPY", "QQQ"];
+
+function isComparePayload(value: unknown): value is ComparePayload {
+  if (!value || typeof value !== "object") return false;
+  const candidate = value as Record<string, unknown>;
+  if ("error" in candidate) return false;
+  return (
+    Array.isArray(candidate.assets) &&
+    Array.isArray(candidate.symbols) &&
+    typeof candidate.normalised_prices === "object" &&
+    candidate.normalised_prices !== null &&
+    typeof candidate.correlation === "object" &&
+    candidate.correlation !== null &&
+    Array.isArray((candidate.correlation as { matrix?: unknown }).matrix)
+  );
+}
 
 // ── Asset Selector Dropdown ──────────────────────────────────────────
 
@@ -263,15 +283,154 @@ function CorrelationGauge({ value }: { value: number; symA: string; symB: string
   );
 }
 
+// ── RRG Quadrant Mini Chart ──────────────────────────────────────────
+
+function RRGQuadrantMini({
+  positions,
+  symbols,
+}: {
+  positions: Record<string, RRGPosition>;
+  symbols: string[];
+}) {
+  // Compute view bounds from all trail points
+  const allPoints = symbols.flatMap((sym) => positions[sym]?.trail ?? []);
+  if (allPoints.length === 0) return null;
+
+  const ratios = allPoints.map((p) => p.ratio);
+  const momentums = allPoints.map((p) => p.momentum);
+  const rMin = Math.min(...ratios);
+  const rMax = Math.max(...ratios);
+  const mMin = Math.min(...momentums);
+  const mMax = Math.max(...momentums);
+
+  // Add padding around data range, ensure 100 is always visible
+  const pad = 0.3;
+  const xLo = Math.min(100, rMin) - (rMax - rMin) * pad - 0.5;
+  const xHi = Math.max(100, rMax) + (rMax - rMin) * pad + 0.5;
+  const yLo = Math.min(100, mMin) - (mMax - mMin) * pad - 0.5;
+  const yHi = Math.max(100, mMax) + (mMax - mMin) * pad + 0.5;
+
+  const W = 220;
+  const H = 200;
+  const mx = 30; // margin left
+  const my = 20; // margin top
+  const pw = W - mx - 10; // plot width
+  const ph = H - my - 20; // plot height
+
+  const toX = (v: number) => mx + ((v - xLo) / (xHi - xLo)) * pw;
+  const toY = (v: number) => my + ((yHi - v) / (yHi - yLo)) * ph;
+
+  const cx = toX(100);
+  const cy = toY(100);
+
+  return (
+    <div className="cmp-side-card">
+      <h4 className="cmp-section-title">Quadrants</h4>
+      <svg width={W} height={H} className="cmp-rrg-svg">
+        {/* Quadrant backgrounds */}
+        <rect x={cx} y={my} width={mx + pw - cx + 10} height={cy - my} rx={3} fill="rgba(76,175,80,0.06)" />
+        <rect x={mx} y={my} width={cx - mx} height={cy - my} rx={3} fill="rgba(90,143,247,0.06)" />
+        <rect x={mx} y={cy} width={cx - mx} height={my + ph - cy + 20} rx={3} fill="rgba(240,115,103,0.06)" />
+        <rect x={cx} y={cy} width={mx + pw - cx + 10} height={my + ph - cy + 20} rx={3} fill="rgba(240,160,64,0.06)" />
+
+        {/* Crosshair */}
+        <line x1={cx} y1={my} x2={cx} y2={my + ph} stroke="var(--border)" strokeWidth={1} strokeDasharray="3,3" />
+        <line x1={mx} y1={cy} x2={mx + pw} y2={cy} stroke="var(--border)" strokeWidth={1} strokeDasharray="3,3" />
+
+        {/* Quadrant labels */}
+        <text x={cx + 4} y={my + 12} fontSize={8} fill="var(--text-muted)" opacity={0.6}>Leading</text>
+        <text x={mx + 2} y={my + 12} fontSize={8} fill="var(--text-muted)" opacity={0.6}>Improving</text>
+        <text x={mx + 2} y={my + ph - 2} fontSize={8} fill="var(--text-muted)" opacity={0.6}>Lagging</text>
+        <text x={cx + 4} y={my + ph - 2} fontSize={8} fill="var(--text-muted)" opacity={0.6}>Weakening</text>
+
+        {/* Trails and dots */}
+        {symbols.map((sym, i) => {
+          const pos = positions[sym];
+          if (!pos?.trail?.length) return null;
+          const color = ASSET_COLORS[i];
+
+          // Trail path
+          const pathD = pos.trail
+            .map((p, j) => `${j === 0 ? "M" : "L"}${toX(p.ratio).toFixed(1)},${toY(p.momentum).toFixed(1)}`)
+            .join(" ");
+
+          const last = pos.trail[pos.trail.length - 1];
+
+          return (
+            <g key={sym}>
+              <path d={pathD} fill="none" stroke={color} strokeWidth={1.5} opacity={0.5} />
+              {/* Trail dots (fading) */}
+              {pos.trail.slice(0, -1).map((p, j) => (
+                <circle
+                  key={j}
+                  cx={toX(p.ratio)}
+                  cy={toY(p.momentum)}
+                  r={2}
+                  fill={color}
+                  opacity={0.15 + (j / pos.trail.length) * 0.4}
+                />
+              ))}
+              {/* Current position */}
+              <circle cx={toX(last.ratio)} cy={toY(last.momentum)} r={5} fill={color} stroke="var(--bg-card)" strokeWidth={2} />
+              <text
+                x={toX(last.ratio) + 8}
+                y={toY(last.momentum) + 4}
+                fontSize={10}
+                fontWeight={700}
+                fill={color}
+              >
+                {sym}
+              </text>
+            </g>
+          );
+        })}
+
+        {/* Axis labels */}
+        <text x={mx + pw / 2} y={H - 2} fontSize={9} fill="var(--text-muted)" textAnchor="middle">RS-Ratio</text>
+        <text x={8} y={my + ph / 2} fontSize={9} fill="var(--text-muted)" textAnchor="middle" transform={`rotate(-90,8,${my + ph / 2})`}>Momentum</text>
+      </svg>
+
+      {/* Quadrant badges */}
+      <div className="cmp-rrg-badges">
+        {symbols.map((sym, i) => {
+          const pos = positions[sym];
+          if (!pos) return null;
+          return (
+            <div key={sym} className="cmp-rrg-badge-row">
+              <span className="cmp-asset-dot" style={{ background: ASSET_COLORS[i] }} />
+              <span className="cmp-rrg-badge-sym">{sym}</span>
+              <span
+                className="cmp-badge"
+                style={{
+                  color: QUADRANT_COLORS[pos.quadrant] ?? "var(--text-muted)",
+                  background: QUADRANT_BG[pos.quadrant] ?? "var(--bg-tertiary)",
+                  fontSize: 10,
+                }}
+              >
+                {pos.quadrant}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 // ── Main Page ────────────────────────────────────────────────────────
 
 export function ComparePage() {
   const [symbols, setSymbols] = useState<string[]>(DEFAULT_PAIR);
   const [lookback, setLookback] = useState(252);
-  const [subTab, setSubTab] = useState<SubChartTab>("rel-strength");
 
   const { data: rawTickers } = useTickersRaw();
-  const { data, isLoading } = useComparison(symbols, lookback);
+  const { data, isLoading, error: queryError } = useComparison(symbols, lookback);
+  const comparison = useMemo(() => (isComparePayload(data) ? data : null), [data]);
+  const payloadError = useMemo(() => {
+    if (!data || typeof data !== "object") return null;
+    if ("error" in data) return data.error;
+    return null;
+  }, [data]);
 
   const allTickers = useMemo(() => {
     if (!rawTickers) return [];
@@ -300,9 +459,11 @@ export function ComparePage() {
 
   // Correlation value for the gauge (from matrix)
   const corrValue = useMemo(() => {
-    if (!data?.correlation?.matrix || data.correlation.matrix.length < 2) return null;
-    return data.correlation.matrix[0][1];
-  }, [data]);
+    if (!comparison?.correlation?.matrix) return null;
+    const row = comparison.correlation.matrix[0];
+    if (!Array.isArray(row) || row.length < 2) return null;
+    return row[1];
+  }, [comparison]);
 
   return (
     <div className="compare-page">
@@ -342,14 +503,26 @@ export function ComparePage() {
 
       {isLoading && <LoadingSpinner message="Loading comparison..." />}
 
-      {data && !isLoading && (
+      {queryError && !isLoading && (
+        <div style={{ padding: "0 20px", color: "var(--text-muted)" }}>
+          Unable to load comparison data. Please try again.
+        </div>
+      )}
+
+      {!isLoading && !queryError && (!comparison || payloadError) && (
+        <div style={{ padding: "0 20px", color: "var(--text-muted)" }}>
+          No comparison available for selected assets/timeframe.
+        </div>
+      )}
+
+      {comparison && !isLoading && !payloadError && (
         <div className="cmp-body-3col">
           {/* ── Left panel: Asset A ── */}
           <div className="cmp-side-panel">
             <AssetPanel
-              asset={data.assets[0]}
+              asset={comparison.assets[0]}
               color={ASSET_COLORS[0]}
-              otherAsset={data.assets[1]}
+              otherAsset={comparison.assets[1]}
             />
 
             {/* RSI gauges */}
@@ -358,24 +531,30 @@ export function ComparePage() {
               {symbols.map((sym, i) => (
                 <RSIGauge
                   key={sym}
-                  value={data.rsi[sym]?.current ?? null}
+                  value={comparison.rsi[sym]?.current ?? null}
                   symbol={sym}
                   color={ASSET_COLORS[i]}
                 />
               ))}
             </div>
+
+            {/* Correlation gauge */}
+            {corrValue != null && (
+              <div className="cmp-side-card">
+                <CorrelationGauge value={corrValue} symA={symbols[0]} symB={symbols[1]} />
+              </div>
+            )}
           </div>
 
           {/* ── Center: Charts ── */}
           <div className="cmp-center">
             {/* Main price overlay chart */}
-            <div className="cmp-chart-section">
+            <div className="cmp-chart-section cmp-chart-main">
               <div className="cmp-chart-header-row">
                 <h3 className="cmp-section-title">Price</h3>
-                {/* Latest % values as colored tags */}
                 <div className="cmp-chart-tags">
                   {symbols.map((sym, i) => {
-                    const series = data.normalised_prices[sym];
+                    const series = comparison.normalised_prices[sym];
                     const lastVal = series?.values?.[series.values.length - 1];
                     return (
                       <span
@@ -392,17 +571,17 @@ export function ComparePage() {
                   })}
                 </div>
               </div>
-              <div className="chart-container" style={{ height: 380 }}>
+              <div className="chart-container">
                 <Plot
                   data={symbols.map((sym, i) => {
-                    const series = data.normalised_prices[sym];
+                    const series = comparison.normalised_prices[sym];
                     if (!series) return { x: [], y: [], type: "scatter" as const, name: sym };
                     return {
                       x: series.dates,
                       y: series.values,
                       type: "scatter" as const,
                       mode: "lines" as const,
-                      name: data.assets[i]?.name ?? sym,
+                      name: comparison.assets[i]?.name ?? sym,
                       line: { color: ASSET_COLORS[i], width: 2.2 },
                       hovertemplate: `%{x}<br>${sym}: %{y:.1f}%<extra></extra>`,
                     };
@@ -410,8 +589,8 @@ export function ComparePage() {
                   layout={{
                     paper_bgcolor: chartBg,
                     plot_bgcolor: chartBg,
-                    height: 380,
-                    margin: { l: 50, r: 20, t: 10, b: 40 },
+                    autosize: true,
+                    margin: { l: 50, r: 20, t: 10, b: 30 },
                     xaxis: {
                       color: textColor(),
                       tickfont: { color: textColor(), size: 10 },
@@ -432,7 +611,7 @@ export function ComparePage() {
                       y: 1.02,
                       xanchor: "left",
                       x: 0,
-                      font: { color: textColor(), size: 11 },
+                      font: { color: textColor(), size: 10 },
                     },
                     hovermode: "x unified",
                   }}
@@ -443,111 +622,90 @@ export function ComparePage() {
               </div>
             </div>
 
-            {/* Sub-chart tabs (Swissblock-style) */}
-            <div className="cmp-chart-section">
-              <div className="cmp-sub-tabs">
-                {SUB_CHART_TABS.map((tab) => (
-                  <button
-                    key={tab.key}
-                    className={`cmp-sub-tab ${subTab === tab.key ? "cmp-sub-tab--active" : ""}`}
-                    onClick={() => setSubTab(tab.key)}
-                  >
-                    {tab.label}
-                  </button>
-                ))}
+            {/* 2x2 Sub-charts grid */}
+            <div className="cmp-charts-grid">
+              {/* Relative Strength */}
+              <div className="cmp-grid-cell">
+                <h4 className="cmp-section-title">Relative Strength</h4>
+                {comparison.relative_strength?.dates?.length > 0 && (
+                  <div className="chart-container">
+                    <Plot
+                      data={[
+                        {
+                          x: comparison.relative_strength.dates,
+                          y: comparison.relative_strength.values,
+                          type: "scatter",
+                          mode: "lines",
+                          name: `${symbols[0]} / ${symbols[1]}`,
+                          line: { color: cssVar("--accent"), width: 1.5 },
+                          fill: "tozeroy",
+                          fillcolor: "rgba(123, 140, 222, 0.06)",
+                          hovertemplate: "%{x}<br>Ratio: %{y:.4f}<extra></extra>",
+                        },
+                      ]}
+                      layout={{
+                        paper_bgcolor: chartBg,
+                        plot_bgcolor: chartBg,
+                        autosize: true,
+                        margin: { l: 45, r: 10, t: 5, b: 25 },
+                        xaxis: { color: textColor(), tickfont: { color: textColor(), size: 9 }, showgrid: false },
+                        yaxis: { color: textColor(), tickfont: { color: textColor(), size: 9 }, gridcolor: gridColor() },
+                        hovermode: "x unified",
+                      }}
+                      config={{ responsive: true, displayModeBar: false }}
+                      useResizeHandler
+                      style={{ width: "100%", height: "100%" }}
+                    />
+                  </div>
+                )}
               </div>
 
-              {/* Relative Strength */}
-              {subTab === "rel-strength" && data.relative_strength?.dates?.length > 0 && (
-                <div className="chart-container" style={{ height: 220 }}>
-                  <Plot
-                    data={[
-                      {
-                        x: data.relative_strength.dates,
-                        y: data.relative_strength.values,
-                        type: "scatter",
-                        mode: "lines",
-                        name: `${symbols[0]} / ${symbols[1]}`,
-                        line: { color: cssVar("--accent"), width: 1.5 },
-                        fill: "tozeroy",
-                        fillcolor: "rgba(123, 140, 222, 0.06)",
-                        hovertemplate: "%{x}<br>Ratio: %{y:.4f}<extra></extra>",
-                      },
-                    ]}
-                    layout={{
-                      paper_bgcolor: chartBg,
-                      plot_bgcolor: chartBg,
-                      height: 220,
-                      margin: { l: 50, r: 20, t: 10, b: 40 },
-                      xaxis: {
-                        color: textColor(),
-                        tickfont: { color: textColor(), size: 10 },
-                        showgrid: false,
-                      },
-                      yaxis: {
-                        color: textColor(),
-                        tickfont: { color: textColor(), size: 10 },
-                        gridcolor: gridColor(),
-                      },
-                      hovermode: "x unified",
-                    }}
-                    config={{ responsive: true, displayModeBar: false }}
-                    useResizeHandler
-                    style={{ width: "100%", height: "100%" }}
-                  />
-                </div>
-              )}
-
               {/* Rolling Correlation */}
-              {subTab === "correlation" && data.rolling_correlation?.dates?.length > 0 && (
-                <div className="chart-container" style={{ height: 220 }}>
-                  <Plot
-                    data={[
-                      {
-                        x: data.rolling_correlation.dates,
-                        y: data.rolling_correlation.values,
-                        type: "scatter",
-                        mode: "lines",
-                        name: "63d Corr",
-                        line: { color: "#B58AF7", width: 1.5 },
-                        fill: "tozeroy",
-                        fillcolor: "rgba(181, 138, 247, 0.06)",
-                        hovertemplate: "%{x}<br>Corr: %{y:.3f}<extra></extra>",
-                      },
-                    ]}
-                    layout={{
-                      paper_bgcolor: chartBg,
-                      plot_bgcolor: chartBg,
-                      height: 220,
-                      margin: { l: 50, r: 20, t: 10, b: 40 },
-                      xaxis: {
-                        color: textColor(),
-                        tickfont: { color: textColor(), size: 10 },
-                        showgrid: false,
-                      },
-                      yaxis: {
-                        color: textColor(),
-                        tickfont: { color: textColor(), size: 10 },
-                        gridcolor: gridColor(),
-                        range: [-1, 1],
-                        zeroline: true,
-                        zerolinecolor: cssVar("--zeroline"),
-                      },
-                      hovermode: "x unified",
-                    }}
-                    config={{ responsive: true, displayModeBar: false }}
-                    useResizeHandler
-                    style={{ width: "100%", height: "100%" }}
-                  />
-                </div>
-              )}
+              <div className="cmp-grid-cell">
+                <h4 className="cmp-section-title">Rolling Correlation (63d)</h4>
+                {comparison.rolling_correlation?.dates?.length > 0 && (
+                  <div className="chart-container">
+                    <Plot
+                      data={[
+                        {
+                          x: comparison.rolling_correlation.dates,
+                          y: comparison.rolling_correlation.values,
+                          type: "scatter",
+                          mode: "lines",
+                          name: "63d Corr",
+                          line: { color: "#B58AF7", width: 1.5 },
+                          fill: "tozeroy",
+                          fillcolor: "rgba(181, 138, 247, 0.06)",
+                          hovertemplate: "%{x}<br>Corr: %{y:.3f}<extra></extra>",
+                        },
+                      ]}
+                      layout={{
+                        paper_bgcolor: chartBg,
+                        plot_bgcolor: chartBg,
+                        autosize: true,
+                        margin: { l: 35, r: 10, t: 5, b: 25 },
+                        xaxis: { color: textColor(), tickfont: { color: textColor(), size: 9 }, showgrid: false },
+                        yaxis: {
+                          color: textColor(), tickfont: { color: textColor(), size: 9 }, gridcolor: gridColor(),
+                          range: [-1, 1], zeroline: true, zerolinecolor: cssVar("--zeroline"),
+                        },
+                        hovermode: "x unified",
+                      }}
+                      config={{ responsive: true, displayModeBar: false }}
+                      useResizeHandler
+                      style={{ width: "100%", height: "100%" }}
+                    />
+                  </div>
+                )}
+              </div>
 
-              {/* Volume comparison */}
-              {subTab === "volume" && (
-                <div className="chart-container" style={{ height: 220 }}>
+              {/* Volume */}
+              <div className="cmp-grid-cell">
+                <h4 className="cmp-section-title">Volume (60d)</h4>
+                <div className="chart-container">
                   <Plot
                     data={symbols.map((sym, i) => {
-                      const vol = data.volume?.[sym];
+                      const vol = comparison.volume?.[sym];
                       if (!vol) return { x: [], y: [], type: "bar" as const, name: sym };
                       return {
                         x: vol.dates,
@@ -561,27 +719,12 @@ export function ComparePage() {
                     layout={{
                       paper_bgcolor: chartBg,
                       plot_bgcolor: chartBg,
-                      height: 220,
-                      margin: { l: 60, r: 20, t: 10, b: 40 },
+                      autosize: true,
+                      margin: { l: 50, r: 10, t: 5, b: 25 },
                       barmode: "group",
-                      xaxis: {
-                        color: textColor(),
-                        tickfont: { color: textColor(), size: 10 },
-                        showgrid: false,
-                      },
-                      yaxis: {
-                        color: textColor(),
-                        tickfont: { color: textColor(), size: 10 },
-                        gridcolor: gridColor(),
-                      },
-                      legend: {
-                        orientation: "h",
-                        yanchor: "bottom",
-                        y: 1.02,
-                        xanchor: "left",
-                        x: 0,
-                        font: { color: textColor(), size: 11 },
-                      },
+                      xaxis: { color: textColor(), tickfont: { color: textColor(), size: 9 }, showgrid: false },
+                      yaxis: { color: textColor(), tickfont: { color: textColor(), size: 9 }, gridcolor: gridColor() },
+                      legend: { orientation: "h", yanchor: "bottom", y: 1.02, xanchor: "left", x: 0, font: { color: textColor(), size: 9 } },
                       hovermode: "x unified",
                     }}
                     config={{ responsive: true, displayModeBar: false }}
@@ -589,15 +732,16 @@ export function ComparePage() {
                     style={{ width: "100%", height: "100%" }}
                   />
                 </div>
-              )}
+              </div>
 
-              {/* RSI time-series */}
-              {subTab === "rsi" && (
-                <div className="chart-container" style={{ height: 220 }}>
+              {/* RSI */}
+              <div className="cmp-grid-cell">
+                <h4 className="cmp-section-title">RSI (14)</h4>
+                <div className="chart-container">
                   <Plot
                     data={[
                       ...symbols.map((sym, i) => {
-                        const rsi = data.rsi?.[sym];
+                        const rsi = comparison.rsi?.[sym];
                         if (!rsi) return { x: [], y: [], type: "scatter" as const, name: sym };
                         return {
                           x: rsi.dates,
@@ -609,10 +753,9 @@ export function ComparePage() {
                           hovertemplate: `%{x}<br>${sym} RSI: %{y:.1f}<extra></extra>`,
                         };
                       }),
-                      // Overbought/oversold lines
                       {
-                        x: data.rsi?.[symbols[0]]?.dates ?? [],
-                        y: Array((data.rsi?.[symbols[0]]?.dates?.length ?? 0)).fill(70),
+                        x: comparison.rsi?.[symbols[0]]?.dates ?? [],
+                        y: Array((comparison.rsi?.[symbols[0]]?.dates?.length ?? 0)).fill(70),
                         type: "scatter" as const,
                         mode: "lines" as const,
                         line: { color: "rgba(240, 115, 103, 0.3)", width: 1, dash: "dash" as const },
@@ -620,8 +763,8 @@ export function ComparePage() {
                         hoverinfo: "skip" as const,
                       },
                       {
-                        x: data.rsi?.[symbols[0]]?.dates ?? [],
-                        y: Array((data.rsi?.[symbols[0]]?.dates?.length ?? 0)).fill(30),
+                        x: comparison.rsi?.[symbols[0]]?.dates ?? [],
+                        y: Array((comparison.rsi?.[symbols[0]]?.dates?.length ?? 0)).fill(30),
                         type: "scatter" as const,
                         mode: "lines" as const,
                         line: { color: "rgba(90, 143, 247, 0.3)", width: 1, dash: "dash" as const },
@@ -632,27 +775,11 @@ export function ComparePage() {
                     layout={{
                       paper_bgcolor: chartBg,
                       plot_bgcolor: chartBg,
-                      height: 220,
-                      margin: { l: 40, r: 20, t: 10, b: 40 },
-                      xaxis: {
-                        color: textColor(),
-                        tickfont: { color: textColor(), size: 10 },
-                        showgrid: false,
-                      },
-                      yaxis: {
-                        color: textColor(),
-                        tickfont: { color: textColor(), size: 10 },
-                        gridcolor: gridColor(),
-                        range: [0, 100],
-                      },
-                      legend: {
-                        orientation: "h",
-                        yanchor: "bottom",
-                        y: 1.02,
-                        xanchor: "left",
-                        x: 0,
-                        font: { color: textColor(), size: 11 },
-                      },
+                      autosize: true,
+                      margin: { l: 30, r: 10, t: 5, b: 25 },
+                      xaxis: { color: textColor(), tickfont: { color: textColor(), size: 9 }, showgrid: false },
+                      yaxis: { color: textColor(), tickfont: { color: textColor(), size: 9 }, gridcolor: gridColor(), range: [0, 100] },
+                      legend: { orientation: "h", yanchor: "bottom", y: 1.02, xanchor: "left", x: 0, font: { color: textColor(), size: 9 } },
                       hovermode: "x unified",
                     }}
                     config={{ responsive: true, displayModeBar: false }}
@@ -660,29 +787,27 @@ export function ComparePage() {
                     style={{ width: "100%", height: "100%" }}
                   />
                 </div>
-              )}
+              </div>
             </div>
           </div>
 
           {/* ── Right panel: Asset B ── */}
           <div className="cmp-side-panel">
             <AssetPanel
-              asset={data.assets[1]}
+              asset={comparison.assets[1]}
               color={ASSET_COLORS[1]}
-              otherAsset={data.assets[0]}
+              otherAsset={comparison.assets[0]}
             />
 
-            {/* Correlation gauge */}
-            {corrValue != null && (
-              <div className="cmp-side-card">
-                <CorrelationGauge value={corrValue} symA={symbols[0]} symB={symbols[1]} />
-              </div>
+            {/* RRG Quadrant mini chart */}
+            {comparison.rrg_positions && Object.keys(comparison.rrg_positions).length > 0 && (
+              <RRGQuadrantMini positions={comparison.rrg_positions} symbols={symbols} />
             )}
 
             {/* Date footer */}
-            {data.as_of_date && (
+            {comparison.as_of_date && (
               <div className="cmp-date-footer">
-                Data as of {formatDate(data.as_of_date)}
+                Data as of {formatDate(comparison.as_of_date)}
               </div>
             )}
           </div>

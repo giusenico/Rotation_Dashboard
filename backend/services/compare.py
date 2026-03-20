@@ -22,7 +22,7 @@ from dataclasses import dataclass, field
 import numpy as np
 import pandas as pd
 
-from backend.config import CACHE_TTL, ALL_TICKERS
+from backend.config import CACHE_TTL, ALL_TICKERS, SECTOR_ETFS, CROSS_ASSET_ETFS
 
 logger = logging.getLogger(__name__)
 
@@ -84,10 +84,12 @@ def _fetch_ohlcv(conn, symbols: list[str], lookback: int) -> pd.DataFrame:
     df = pd.DataFrame(rows, columns=["symbol", "date", "open", "high", "low", "close", "adj_close", "volume"])
     df["date"] = pd.to_datetime(df["date"])
 
-    # Keep only last N trading days (based on union of all dates)
+    # Keep last N + buffer trading days so that return calculations
+    # (which need lookback+1 points) always have enough data.
+    fetch_size = lookback + 30
     all_dates = sorted(df["date"].unique())
-    if len(all_dates) > lookback:
-        cutoff = all_dates[-lookback]
+    if len(all_dates) > fetch_size:
+        cutoff = all_dates[-fetch_size]
         df = df[df["date"] >= cutoff]
 
     return df
@@ -246,13 +248,15 @@ def _compute_performance(df: pd.DataFrame) -> dict:
                 return None
             return round((last / prev - 1) * 100, 2)
 
-        # YTD
-        year_start = grp[grp["date"].dt.month == 1].head(1)
+        # YTD — first trading day of the current year
+        last_date = grp["date"].iloc[-1]
+        year_start_date = pd.Timestamp(year=last_date.year, month=1, day=1)
+        ytd_rows = grp[grp["date"] >= year_start_date].head(1)
         ytd = None
-        if len(year_start) > 0:
-            p0 = (year_start["adj_close"].fillna(year_start["close"])).iloc[0]
+        if len(ytd_rows) > 0:
+            p0 = (ytd_rows["adj_close"].fillna(ytd_rows["close"])).iloc[0]
             if p0 and p0 != 0:
-                ytd = round((last / p0 - 1) * 100, 2)
+                ytd = round((float(last) / float(p0) - 1) * 100, 2)
 
         result[symbol] = {
             "last_price": round(float(last), 2),
@@ -263,6 +267,83 @@ def _compute_performance(df: pd.DataFrame) -> dict:
             "return_1y": _ret(252),
             "return_ytd": ytd,
         }
+    return result
+
+
+def _compute_rrg_positions(
+    conn, symbols: list[str], benchmark_symbol: str = "^GSPC",
+    rs_span: int = 20, momentum_span: int = 10, trail_length: int = 5,
+) -> dict:
+    """Compute RRG RS-Ratio & RS-Momentum for given symbols vs benchmark.
+
+    Returns {symbol: {ratio, momentum, quadrant, trail: [{date, ratio, momentum}, ...]}}.
+    """
+    from backend.services.rrg import assign_quadrant
+
+    all_syms = list(set(symbols + [benchmark_symbol]))
+    placeholders = ",".join(["%s"] * len(all_syms))
+    query = f"""
+        SELECT symbol, date, adj_close
+        FROM daily_prices
+        WHERE symbol IN ({placeholders})
+        ORDER BY date
+    """
+    with conn.cursor() as cur:
+        cur.execute(query, all_syms)
+        rows = cur.fetchall()
+
+    if not rows:
+        return {}
+
+    df = pd.DataFrame(rows, columns=["symbol", "date", "adj_close"])
+    df["date"] = pd.to_datetime(df["date"])
+    pivot = df.pivot(index="date", columns="symbol", values="adj_close").sort_index()
+    pivot = pivot.ffill()
+
+    # Resample to weekly (matches RRG page default)
+    pivot = pivot.resample("W").last()
+
+    if benchmark_symbol not in pivot.columns:
+        return {}
+
+    benchmark = pivot[benchmark_symbol]
+    available = [s for s in symbols if s in pivot.columns]
+    if not available:
+        return {}
+
+    sectors = pivot[available]
+
+    # RS computation (same as rrg.py)
+    rs = sectors.div(benchmark / 100, axis=0).ewm(span=rs_span, adjust=False).mean()
+    rel_ratio = 100 + (rs - rs.mean()) / rs.std()
+
+    rs_momentum_pct = rel_ratio.pct_change().ewm(span=momentum_span, adjust=False).mean()
+    momentum = 100 + rs_momentum_pct / rs_momentum_pct.std()
+
+    result = {}
+    ratio_tail = rel_ratio.tail(trail_length)
+    momentum_tail = momentum.tail(trail_length)
+
+    for sym in available:
+        trail = []
+        for date_idx in ratio_tail.index:
+            r = ratio_tail.at[date_idx, sym]
+            m = momentum_tail.at[date_idx, sym]
+            if pd.notna(r) and pd.notna(m):
+                trail.append({
+                    "date": date_idx.strftime("%Y-%m-%d"),
+                    "ratio": round(float(r), 4),
+                    "momentum": round(float(m), 4),
+                })
+        if trail:
+            latest = trail[-1]
+            result[sym] = {
+                "ratio": latest["ratio"],
+                "momentum": latest["momentum"],
+                "quadrant": assign_quadrant(latest["ratio"], latest["momentum"]),
+                "trail": trail,
+            }
+
     return result
 
 
@@ -297,72 +378,80 @@ def get_comparison(conn, symbols: list[str], lookback: int = DEFAULT_LOOKBACK) -
     if cached is not None:
         return cached
 
-    logger.info("Computing comparison for %s (lookback=%d)", symbols, lookback)
+    try:
+        logger.info("Computing comparison for %s (lookback=%d)", symbols, lookback)
 
-    df = _fetch_ohlcv(conn, symbols, lookback)
-    if df.empty:
-        return {"symbols": symbols, "error": "No data found"}
+        df = _fetch_ohlcv(conn, symbols, lookback)
+        if df.empty:
+            return {"symbols": symbols, "error": "No data found"}
 
-    obv_data = _fetch_obv_latest(conn, symbols)
+        obv_data = _fetch_obv_latest(conn, symbols)
 
-    # Build asset info
-    assets = []
-    performance = _compute_performance(df)
-    regime = _compute_regime_simple(df)
-    for sym in symbols:
-        name = ALL_TICKERS.get(sym, sym)
-        perf = performance.get(sym, {})
-        reg = regime.get(sym, {})
-        obv = obv_data.get(sym, {})
-        assets.append({
-            "symbol": sym,
-            "name": name,
-            "last_price": perf.get("last_price"),
-            "return_1w": perf.get("return_1w"),
-            "return_1m": perf.get("return_1m"),
-            "return_3m": perf.get("return_3m"),
-            "return_6m": perf.get("return_6m"),
-            "return_1y": perf.get("return_1y"),
-            "return_ytd": perf.get("return_ytd"),
-            "regime": reg.get("regime", "unknown"),
-            "sma_distance_pct": reg.get("sma_distance_pct"),
-            "obv_regime": obv.get("obv_regime"),
-            "rotation_score": obv.get("rotation_score"),
-        })
+        # Build asset info
+        assets = []
+        performance = _compute_performance(df)
+        regime = _compute_regime_simple(df)
+        for sym in symbols:
+            name = ALL_TICKERS.get(sym, sym)
+            perf = performance.get(sym, {})
+            reg = regime.get(sym, {})
+            obv = obv_data.get(sym, {})
+            assets.append({
+                "symbol": sym,
+                "name": name,
+                "last_price": perf.get("last_price"),
+                "return_1w": perf.get("return_1w"),
+                "return_1m": perf.get("return_1m"),
+                "return_3m": perf.get("return_3m"),
+                "return_6m": perf.get("return_6m"),
+                "return_1y": perf.get("return_1y"),
+                "return_ytd": perf.get("return_ytd"),
+                "regime": reg.get("regime", "unknown"),
+                "sma_distance_pct": reg.get("sma_distance_pct"),
+                "obv_regime": obv.get("obv_regime"),
+                "rotation_score": obv.get("rotation_score"),
+            })
 
-    # Normalised prices
-    norm_prices = _compute_normalised_prices(df)
+        # Normalised prices
+        norm_prices = _compute_normalised_prices(df)
 
-    # Correlation matrix
-    corr_matrix = _compute_correlation_matrix(df, symbols)
+        # Correlation matrix
+        corr_matrix = _compute_correlation_matrix(df, symbols)
 
-    # Rolling correlation (only for first pair)
-    rolling_corr = _compute_rolling_correlation(df, symbols[0], symbols[1], window=63) if len(symbols) >= 2 else {}
+        # Rolling correlation (only for first pair)
+        rolling_corr = _compute_rolling_correlation(df, symbols[0], symbols[1], window=63) if len(symbols) >= 2 else {}
 
-    # RSI per asset
-    rsi = _compute_rsi_per_asset(df)
+        # RSI per asset
+        rsi = _compute_rsi_per_asset(df)
 
-    # Volume
-    volume = _compute_volume_comparison(df)
+        # Volume
+        volume = _compute_volume_comparison(df)
 
-    # Relative strength (A/B ratio) for first pair
-    rel_strength = _compute_relative_strength(df, symbols[0], symbols[1]) if len(symbols) >= 2 else {}
+        # Relative strength (A/B ratio) for first pair
+        rel_strength = _compute_relative_strength(df, symbols[0], symbols[1]) if len(symbols) >= 2 else {}
 
-    # As-of date
-    as_of = df["date"].max().strftime("%Y-%m-%d") if len(df) > 0 else None
+        # RRG positions (RS-Ratio & RS-Momentum vs benchmark)
+        rrg_positions = _compute_rrg_positions(conn, symbols)
 
-    result = {
-        "symbols": symbols,
-        "lookback": lookback,
-        "as_of_date": as_of,
-        "assets": assets,
-        "normalised_prices": norm_prices,
-        "correlation": corr_matrix,
-        "rolling_correlation": rolling_corr,
-        "rsi": rsi,
-        "volume": volume,
-        "relative_strength": rel_strength,
-    }
+        # As-of date
+        as_of = df["date"].max().strftime("%Y-%m-%d") if len(df) > 0 else None
 
-    _cache_set(cache_key, result)
-    return result
+        result = {
+            "symbols": symbols,
+            "lookback": lookback,
+            "as_of_date": as_of,
+            "assets": assets,
+            "normalised_prices": norm_prices,
+            "correlation": corr_matrix,
+            "rolling_correlation": rolling_corr,
+            "rsi": rsi,
+            "volume": volume,
+            "relative_strength": rel_strength,
+            "rrg_positions": rrg_positions,
+        }
+
+        _cache_set(cache_key, result)
+        return result
+    except Exception:
+        logger.exception("Failed to build comparison for symbols=%s lookback=%d", symbols, lookback)
+        return {"symbols": symbols, "error": "Comparison service temporarily unavailable"}

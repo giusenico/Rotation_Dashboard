@@ -398,21 +398,25 @@ def get_obv_structure(
     if cached is not None:
         return cached  # type: ignore[return-value]
 
-    result = _compute_all(conn, ticker_map, timeframe=timeframe)
+    try:
+        result = _compute_all(conn, ticker_map, timeframe=timeframe)
 
-    # Only persist daily metrics to DB
-    if timeframe == "daily":
-        today_str = date.today().isoformat()
-        try:
-            if not _today_already_written(conn, today_str):
-                _write_daily_metrics(conn, today_str, result)
-                invalidate_cache()
-                logger.info("OBV daily metrics written for %s", today_str)
-        except Exception as exc:
-            logger.warning("Failed to persist OBV metrics: %s", exc)
+        # Only persist daily metrics to DB
+        if timeframe == "daily":
+            today_str = date.today().isoformat()
+            try:
+                if not _today_already_written(conn, today_str):
+                    _write_daily_metrics(conn, today_str, result)
+                    invalidate_cache()
+                    logger.info("OBV daily metrics written for %s", today_str)
+            except Exception as exc:
+                logger.warning("Failed to persist OBV metrics: %s", exc)
 
-    _cache_set(cache_key, result)
-    return result
+        _cache_set(cache_key, result)
+        return result
+    except Exception:
+        logger.exception("Failed to build OBV structure timeframe=%s", timeframe)
+        return []
 
 
 # ── Public API: score history ─────────────────────────────────────────
@@ -440,36 +444,40 @@ def get_obv_score_history(
     if cached is not None:
         return cached  # type: ignore[return-value]
 
-    placeholders = ",".join(["%s"] * len(syms))
-    with conn.cursor() as cur:
-        cur.execute(
-            f"""
-            SELECT symbol, date, rotation_score, obv_regime
-            FROM obv_daily_metrics
-            WHERE symbol IN ({placeholders})
-              AND date >= CURRENT_DATE - INTERVAL '{int(lookback_days)} days'
-            ORDER BY symbol, date
-            """,
-            syms,
-        )
-        rows = cur.fetchall()
+    try:
+        placeholders = ",".join(["%s"] * len(syms))
+        with conn.cursor() as cur:
+            cur.execute(
+                f"""
+                SELECT symbol, date, rotation_score, obv_regime
+                FROM obv_daily_metrics
+                WHERE symbol IN ({placeholders})
+                  AND date >= CURRENT_DATE - INTERVAL '{int(lookback_days)} days'
+                ORDER BY symbol, date
+                """,
+                syms,
+            )
+            rows = cur.fetchall()
 
-    grouped: dict[str, list[dict]] = {s: [] for s in syms}
-    for sym, dt, score, regime in rows:
-        grouped[sym].append({
-            "date": dt.isoformat() if hasattr(dt, "isoformat") else str(dt),
-            "rotation_score": score,
-            "obv_regime": regime,
-        })
+        grouped: dict[str, list[dict]] = {s: [] for s in syms}
+        for sym, dt, score, regime in rows:
+            grouped[sym].append({
+                "date": dt.isoformat() if hasattr(dt, "isoformat") else str(dt),
+                "rotation_score": score,
+                "obv_regime": regime,
+            })
 
-    result = [
-        {"symbol": sym, "asset": ticker_map[sym], "data": grouped[sym]}
-        for sym in syms
-        if grouped[sym]
-    ]
+        result = [
+            {"symbol": sym, "asset": ticker_map[sym], "data": grouped[sym]}
+            for sym in syms
+            if grouped[sym]
+        ]
 
-    _cache_set(cache_key, result)
-    return result
+        _cache_set(cache_key, result)
+        return result
+    except Exception:
+        logger.exception("Failed to build OBV score history symbols=%s lookback=%d", syms, lookback_days)
+        return []
 
 
 # ── Public API: single-asset detail ──────────────────────────────────
@@ -498,70 +506,74 @@ def get_obv_detail(
     if cached is not None:
         return cached  # type: ignore[return-value]
 
-    data_map = _fetch_for_timeframe(conn, [symbol], timeframe)
-    if symbol not in data_map:
+    try:
+        data_map = _fetch_for_timeframe(conn, [symbol], timeframe)
+        if symbol not in data_map:
+            return None
+
+        df = data_map[symbol]
+        close = df["adj_close"]
+        volume = df["volume"]
+
+        params = TIMEFRAME_PARAMS[timeframe]
+        sma_len = params["sma_len"]
+        rank_lookback = params["rank_lookback"]
+        roc_len = params["roc_len"]
+
+        obv = _compute_obv(close, volume)
+        spread, _ = _compute_spread(obv, sma_len)
+
+        tail_obv = obv.dropna().tail(lookback_bars)
+        tail_spread = spread.dropna().tail(lookback_bars)
+
+        fmt = "%Y-%m-%d %H:%M" if timeframe == "4h" else "%Y-%m-%d"
+
+        obv_series = [
+            {"date": idx.strftime(fmt), "value": round(float(v), 0)}
+            for idx, v in tail_obv.items()
+        ]
+        spread_series_out = [
+            {"date": idx.strftime(fmt), "value": round(float(v), 2)}
+            for idx, v in tail_spread.items()
+        ]
+
+        # Score history (computed on-the-fly for all timeframes)
+        score_history = _compute_rolling_scores(
+            spread, rank_lookback, roc_len, lookback_bars, fmt
+        )
+
+        # Current metrics
+        spread_pctl = _pct_rank_last(spread, rank_lookback)
+        roc = spread.diff(roc_len)
+        spread_vol = spread.rolling(rank_lookback).std()
+        z_momo: float = np.nan
+        last_vol = spread_vol.iloc[-1]
+        if len(spread) > roc_len and last_vol != 0 and not pd.isna(last_vol):
+            z_momo = float(np.tanh(roc.iloc[-1] / (last_vol + 1e-9)))
+        mean_val = np.nanmean([spread_pctl, z_momo])
+        score: float | None = float(np.clip(mean_val, -1, 1)) if not np.isnan(mean_val) else None
+
+        last_price = round(float(close.iloc[-1]), 2) if len(close) > 0 else None
+
+        result = {
+            "symbol": symbol,
+            "asset": ticker_map[symbol],
+            "obv_regime": _regime(float(spread.iloc[-1])),
+            "last_price": last_price,
+            "rotation_score": round(score, 4) if score is not None else None,
+            "spread_percentile": round(float(spread_pctl), 4) if not np.isnan(spread_pctl) else None,
+            "spread_momentum_z": round(float(z_momo), 4) if not np.isnan(z_momo) else None,
+            "return_1m": _trailing_return(close, params["ret_1m"]),
+            "return_3m": _trailing_return(close, params["ret_3m"]),
+            "return_6m": _trailing_return(close, params["ret_6m"]),
+            "return_ytd": _trailing_return(close, "YTD"),
+            "obv_series": obv_series,
+            "spread_series": spread_series_out,
+            "score_history": score_history,
+        }
+
+        _cache_set(cache_key, result)
+        return result
+    except Exception:
+        logger.exception("Failed to build OBV detail symbol=%s timeframe=%s", symbol, timeframe)
         return None
-
-    df = data_map[symbol]
-    close = df["adj_close"]
-    volume = df["volume"]
-
-    params = TIMEFRAME_PARAMS[timeframe]
-    sma_len = params["sma_len"]
-    rank_lookback = params["rank_lookback"]
-    roc_len = params["roc_len"]
-
-    obv = _compute_obv(close, volume)
-    spread, _ = _compute_spread(obv, sma_len)
-
-    tail_obv = obv.dropna().tail(lookback_bars)
-    tail_spread = spread.dropna().tail(lookback_bars)
-
-    fmt = "%Y-%m-%d %H:%M" if timeframe == "4h" else "%Y-%m-%d"
-
-    obv_series = [
-        {"date": idx.strftime(fmt), "value": round(float(v), 0)}
-        for idx, v in tail_obv.items()
-    ]
-    spread_series_out = [
-        {"date": idx.strftime(fmt), "value": round(float(v), 2)}
-        for idx, v in tail_spread.items()
-    ]
-
-    # Score history (computed on-the-fly for all timeframes)
-    score_history = _compute_rolling_scores(
-        spread, rank_lookback, roc_len, lookback_bars, fmt
-    )
-
-    # Current metrics
-    spread_pctl = _pct_rank_last(spread, rank_lookback)
-    roc = spread.diff(roc_len)
-    spread_vol = spread.rolling(rank_lookback).std()
-    z_momo: float = np.nan
-    last_vol = spread_vol.iloc[-1]
-    if len(spread) > roc_len and last_vol != 0 and not pd.isna(last_vol):
-        z_momo = float(np.tanh(roc.iloc[-1] / (last_vol + 1e-9)))
-    mean_val = np.nanmean([spread_pctl, z_momo])
-    score: float | None = float(np.clip(mean_val, -1, 1)) if not np.isnan(mean_val) else None
-
-    last_price = round(float(close.iloc[-1]), 2) if len(close) > 0 else None
-
-    result = {
-        "symbol": symbol,
-        "asset": ticker_map[symbol],
-        "obv_regime": _regime(float(spread.iloc[-1])),
-        "last_price": last_price,
-        "rotation_score": round(score, 4) if score is not None else None,
-        "spread_percentile": round(float(spread_pctl), 4) if not np.isnan(spread_pctl) else None,
-        "spread_momentum_z": round(float(z_momo), 4) if not np.isnan(z_momo) else None,
-        "return_1m": _trailing_return(close, params["ret_1m"]),
-        "return_3m": _trailing_return(close, params["ret_3m"]),
-        "return_6m": _trailing_return(close, params["ret_6m"]),
-        "return_ytd": _trailing_return(close, "YTD"),
-        "obv_series": obv_series,
-        "spread_series": spread_series_out,
-        "score_history": score_history,
-    }
-
-    _cache_set(cache_key, result)
-    return result

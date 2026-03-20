@@ -21,6 +21,18 @@ import pandas as pd
 from backend.config import CACHE_TTL
 
 logger = logging.getLogger(__name__)
+_EMPTY_SUMMARY = {
+    "vix_last": None,
+    "vix3m_last": None,
+    "sp500_last": None,
+    "vix_ratio": None,
+    "ratio_ma50": None,
+    "vix_oscillator": None,
+    "ratio_oscillator": None,
+    "signal": "neutral",
+    "position": "cash",
+    "as_of_date": "",
+}
 
 # ── Constants ────────────────────────────────────────────────────────
 
@@ -174,44 +186,42 @@ def get_volatility_summary(conn, window: int = 252) -> dict:
     if cached is not None:
         return cached
 
-    close_map = _fetch_close_daily(conn, VIX_SYMBOLS)
-    combined = _compute_vix_all(close_map, window)
+    try:
+        close_map = _fetch_close_daily(conn, VIX_SYMBOLS)
+        combined = _compute_vix_all(close_map, window)
 
-    if combined is None or combined.empty:
-        return {
-            "vix_last": None, "vix3m_last": None, "sp500_last": None,
-            "vix_ratio": None, "ratio_ma50": None,
-            "vix_oscillator": None, "ratio_oscillator": None,
-            "signal": "neutral", "position": "cash",
-            "as_of_date": "",
+        if combined is None or combined.empty:
+            return dict(_EMPTY_SUMMARY)
+
+        last = combined.iloc[-1]
+        vix_osc = _safe_float(last.get("vix_oscillator"))
+        ratio_osc = _safe_float(last.get("ratio_oscillator"))
+
+        # Determine current strategy position (invested if previous day osc < 0.3)
+        if len(combined) >= 2:
+            prev_osc = _safe_float(combined["vix_oscillator"].iloc[-2])
+            position = "invested" if (prev_osc is not None and prev_osc < BUY_THRESHOLD) else "cash"
+        else:
+            position = "cash"
+
+        result = {
+            "vix_last": _safe_float(last["vix"], 2),
+            "vix3m_last": _safe_float(last["vix3m"], 2),
+            "sp500_last": _safe_float(last["sp500"], 2),
+            "vix_ratio": _safe_float(last["vix_ratio"], 4),
+            "ratio_ma50": _safe_float(last["ratio_ma50"], 4),
+            "vix_oscillator": vix_osc,
+            "ratio_oscillator": ratio_osc,
+            "signal": _signal_label(vix_osc, ratio_osc),
+            "position": position,
+            "as_of_date": combined.index[-1].strftime("%Y-%m-%d"),
         }
 
-    last = combined.iloc[-1]
-    vix_osc = _safe_float(last.get("vix_oscillator"))
-    ratio_osc = _safe_float(last.get("ratio_oscillator"))
-
-    # Determine current strategy position (invested if previous day osc < 0.3)
-    if len(combined) >= 2:
-        prev_osc = _safe_float(combined["vix_oscillator"].iloc[-2])
-        position = "invested" if (prev_osc is not None and prev_osc < BUY_THRESHOLD) else "cash"
-    else:
-        position = "cash"
-
-    result = {
-        "vix_last": _safe_float(last["vix"], 2),
-        "vix3m_last": _safe_float(last["vix3m"], 2),
-        "sp500_last": _safe_float(last["sp500"], 2),
-        "vix_ratio": _safe_float(last["vix_ratio"], 4),
-        "ratio_ma50": _safe_float(last["ratio_ma50"], 4),
-        "vix_oscillator": vix_osc,
-        "ratio_oscillator": ratio_osc,
-        "signal": _signal_label(vix_osc, ratio_osc),
-        "position": position,
-        "as_of_date": combined.index[-1].strftime("%Y-%m-%d"),
-    }
-
-    _cache_set(cache_key, result)
-    return result
+        _cache_set(cache_key, result)
+        return result
+    except Exception:
+        logger.exception("Failed to build volatility summary window=%d", window)
+        return dict(_EMPTY_SUMMARY)
 
 
 # ── Public API: VIX detail (charts) ─────────────────────────────────
@@ -227,67 +237,77 @@ def get_volatility_detail(
     if cached is not None:
         return cached
 
-    close_map = _fetch_close_daily(conn, VIX_SYMBOLS)
-    combined = _compute_vix_all(close_map, window)
+    try:
+        close_map = _fetch_close_daily(conn, VIX_SYMBOLS)
+        combined = _compute_vix_all(close_map, window)
 
-    empty_result = {
-        "summary": get_volatility_summary(conn, window),
-        "vix_series": [],
-        "oscillator_series": [],
-        "ratio_series": [],
-        "backtest_series": [],
-    }
+        empty_result = {
+            "summary": get_volatility_summary(conn, window),
+            "vix_series": [],
+            "oscillator_series": [],
+            "ratio_series": [],
+            "backtest_series": [],
+        }
 
-    if combined is None or combined.empty:
-        return empty_result
+        if combined is None or combined.empty:
+            return empty_result
 
-    tail = combined.tail(lookback_bars)
-    bt = _compute_backtest(tail)
-    fmt = "%Y-%m-%d"
+        tail = combined.tail(lookback_bars)
+        bt = _compute_backtest(tail)
+        fmt = "%Y-%m-%d"
 
-    vix_series = [
-        {"date": idx.strftime(fmt),
-         "vix": _safe_float(row["vix"], 2),
-         "vix3m": _safe_float(row["vix3m"], 2)}
-        for idx, row in tail.iterrows()
-    ]
-
-    oscillator_series = [
-        {"date": idx.strftime(fmt),
-         "vix_osc": _safe_float(row["vix_oscillator"]),
-         "ratio_osc": _safe_float(row["ratio_oscillator"])}
-        for idx, row in tail.iterrows()
-        if pd.notna(row.get("vix_oscillator"))
-    ]
-
-    ratio_series = [
-        {"date": idx.strftime(fmt),
-         "ratio": _safe_float(row["vix_ratio"], 4),
-         "ratio_ma50": _safe_float(row["ratio_ma50"], 4)}
-        for idx, row in tail.iterrows()
-        if pd.notna(row.get("vix_ratio"))
-    ]
-
-    backtest_series = []
-    if not bt.empty:
-        backtest_series = [
+        vix_series = [
             {"date": idx.strftime(fmt),
-             "strategy": _safe_float(row["strategy_cum"], 4),
-             "benchmark": _safe_float(row["sp500_cum"], 4),
-             "position": int(row["position"])}
-            for idx, row in bt.iterrows()
-            if pd.notna(row.get("strategy_cum"))
+             "vix": _safe_float(row["vix"], 2),
+             "vix3m": _safe_float(row["vix3m"], 2)}
+            for idx, row in tail.iterrows()
         ]
 
-    summary = get_volatility_summary(conn, window)
+        oscillator_series = [
+            {"date": idx.strftime(fmt),
+             "vix_osc": _safe_float(row["vix_oscillator"]),
+             "ratio_osc": _safe_float(row["ratio_oscillator"])}
+            for idx, row in tail.iterrows()
+            if pd.notna(row.get("vix_oscillator"))
+        ]
 
-    result = {
-        "summary": summary,
-        "vix_series": vix_series,
-        "oscillator_series": oscillator_series,
-        "ratio_series": ratio_series,
-        "backtest_series": backtest_series,
-    }
+        ratio_series = [
+            {"date": idx.strftime(fmt),
+             "ratio": _safe_float(row["vix_ratio"], 4),
+             "ratio_ma50": _safe_float(row["ratio_ma50"], 4)}
+            for idx, row in tail.iterrows()
+            if pd.notna(row.get("vix_ratio"))
+        ]
 
-    _cache_set(cache_key, result)
-    return result
+        backtest_series = []
+        if not bt.empty:
+            backtest_series = [
+                {"date": idx.strftime(fmt),
+                 "strategy": _safe_float(row["strategy_cum"], 4),
+                 "benchmark": _safe_float(row["sp500_cum"], 4),
+                 "position": int(row["position"])}
+                for idx, row in bt.iterrows()
+                if pd.notna(row.get("strategy_cum"))
+            ]
+
+        summary = get_volatility_summary(conn, window)
+
+        result = {
+            "summary": summary,
+            "vix_series": vix_series,
+            "oscillator_series": oscillator_series,
+            "ratio_series": ratio_series,
+            "backtest_series": backtest_series,
+        }
+
+        _cache_set(cache_key, result)
+        return result
+    except Exception:
+        logger.exception("Failed to build volatility detail lookback=%d window=%d", lookback_bars, window)
+        return {
+        "summary": dict(_EMPTY_SUMMARY),
+            "vix_series": [],
+            "oscillator_series": [],
+            "ratio_series": [],
+            "backtest_series": [],
+        }

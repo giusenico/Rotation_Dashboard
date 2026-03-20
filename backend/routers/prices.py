@@ -3,6 +3,7 @@
 from fastapi import APIRouter, Depends, Query, HTTPException
 
 from backend.database import get_db
+from backend.utils.params import normalize_symbol, parse_symbol_list
 from backend.models.schemas import (
     PriceResponse,
     PerformanceEntry,
@@ -29,14 +30,16 @@ def performance(
     symbols: str = Query("all", description="Comma-separated symbols or 'all', 'sectors', 'cross-asset'"),
     conn=Depends(get_db),
 ):
-    if symbols == "all":
+    if symbols.strip().lower() == "all":
         sym_list = [s for s in ALL_TICKERS if s != "^GSPC"]
-    elif symbols == "sectors":
+    elif symbols.strip().lower() == "sectors":
         sym_list = list(SECTOR_ETFS.keys())
-    elif symbols == "cross-asset":
+    elif symbols.strip().lower() == "cross-asset":
         sym_list = list(CROSS_ASSET_ETFS.keys())
     else:
-        sym_list = [s.strip() for s in symbols.split(",")]
+        sym_list = parse_symbol_list(symbols)
+        if not sym_list:
+            raise HTTPException(status_code=400, detail="At least 1 symbol required")
     return compute_performance(conn, sym_list)
 
 
@@ -46,7 +49,9 @@ def correlation(
     lookback_days: int = Query(252, ge=30, le=1000),
     conn=Depends(get_db),
 ):
-    sym_list = [s.strip() for s in symbols.split(",")]
+    sym_list = parse_symbol_list(symbols)
+    if not sym_list:
+        raise HTTPException(status_code=400, detail="At least 1 symbol required")
     return compute_correlation(conn, sym_list, lookback_days)
 
 
@@ -57,7 +62,9 @@ def multi_prices(
     end_date: str | None = None,
     conn=Depends(get_db),
 ):
-    sym_list = [s.strip() for s in symbols.split(",")]
+    sym_list = parse_symbol_list(symbols)
+    if not sym_list:
+        raise HTTPException(status_code=400, detail="At least 1 symbol required")
     results = []
     for sym in sym_list:
         data = get_price_series(conn, sym, start_date, end_date)
@@ -101,6 +108,9 @@ def drawdown(
     end_date: str | None = None,
     conn=Depends(get_db),
 ):
+    symbol = normalize_symbol(symbol)
+    if not symbol:
+        raise HTTPException(status_code=400, detail="Symbol is required")
     data = compute_drawdown(conn, symbol, start_date, end_date)
     return {
         "symbol": symbol,
@@ -116,6 +126,9 @@ def price_series(
     end_date: str | None = None,
     conn=Depends(get_db),
 ):
+    symbol = normalize_symbol(symbol)
+    if not symbol:
+        raise HTTPException(status_code=400, detail="Symbol is required")
     data = get_price_series(conn, symbol, start_date, end_date)
     if not data:
         raise HTTPException(status_code=404, detail=f"No price data for '{symbol}'")

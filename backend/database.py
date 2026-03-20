@@ -10,8 +10,13 @@ from contextlib import contextmanager
 
 import psycopg2
 from psycopg2 import pool
+from psycopg2 import extensions
 
 from backend.config import SUPABASE_DB_URL
+
+import logging
+
+logger = logging.getLogger(__name__)
 
 _pool: pool.ThreadedConnectionPool | None = None
 
@@ -37,8 +42,21 @@ def get_connection():
     conn = _pool.getconn()
     try:
         yield conn
+    except Exception:
+        if conn is not None and conn.closed == 0:
+            try:
+                conn.rollback()
+            except Exception as exc:
+                logger.exception("Failed to rollback failed request connection: %s", exc)
+        raise
     finally:
-        _pool.putconn(conn)
+        if conn is not None:
+            if conn.closed == 0 and conn.status != extensions.STATUS_READY:
+                try:
+                    conn.rollback()
+                except Exception:
+                    logger.exception("Failed to reset connection before return")
+            _pool.putconn(conn)
 
 
 def get_db():

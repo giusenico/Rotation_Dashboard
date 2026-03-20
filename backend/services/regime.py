@@ -313,61 +313,69 @@ def get_regime_summary(
     if cached is not None:
         return cached
 
-    params = TIMEFRAME_PARAMS[timeframe]
-    ticker_map = {s: n for s, n in ALL_TICKERS.items()
-                  if TICKER_CATEGORY_MAP.get(s) not in ("Volatility Index", "Macro Only")}
-    symbols = list(ticker_map.keys())
-    data_map = _fetch_for_timeframe(conn, symbols, timeframe)
+    try:
+        params = TIMEFRAME_PARAMS[timeframe]
+        ticker_map = {s: n for s, n in ALL_TICKERS.items()
+                      if TICKER_CATEGORY_MAP.get(s) not in ("Volatility Index", "Macro Only")}
+        symbols = list(ticker_map.keys())
+        data_map = _fetch_for_timeframe(conn, symbols, timeframe)
 
-    results: list[dict] = []
-    for sym, name in ticker_map.items():
-        if sym not in data_map:
-            continue
+        results: list[dict] = []
+        for sym, name in ticker_map.items():
+            if sym not in data_map:
+                continue
 
-        df = data_map[sym]
-        close = df["adj_close"]
-        high = df["high"]
-        low = df["low"]
-        volume = df["volume"]
+            df = data_map[sym]
+            close = df["adj_close"]
+            high = df["high"]
+            low = df["low"]
+            volume = df["volume"]
 
-        regime = _compute_regime(close, params["sma_len"], params["neutral_bw"])
-        overext, threshold = _compute_overextension(
-            close, high, low,
-            params["sma_len"], overext_mode,
-            params["stdev_len"], params["atr_len"],
-        )
-
-        # Capital flows: skip if volume is all zeros (e.g. ^GSPC)
-        has_volume = volume.sum() > 0
-        if has_volume:
-            flow_z = _compute_capital_flows(
-                close, volume, params["flow_sma"], params["flow_z_len"],
+            regime = _compute_regime(close, params["sma_len"], params["neutral_bw"])
+            overext, threshold = _compute_overextension(
+                close, high, low,
+                params["sma_len"], overext_mode,
+                params["stdev_len"], params["atr_len"],
             )
-            flow_val = _safe_float(flow_z.iloc[-1])
-        else:
-            flow_val = None
 
-        regime_val = int(regime.iloc[-1])
-        overext_val = _safe_float(overext.iloc[-1])
-        basis = close.rolling(params["sma_len"], min_periods=1).mean()
+            # Capital flows: skip if volume is all zeros (e.g. ^GSPC)
+            has_volume = volume.sum() > 0
+            if has_volume:
+                flow_z = _compute_capital_flows(
+                    close, volume, params["flow_sma"], params["flow_z_len"],
+                )
+                flow_val = _safe_float(flow_z.iloc[-1])
+            else:
+                flow_val = None
 
-        results.append({
-            "symbol": sym,
-            "asset": name,
-            "category": TICKER_CATEGORY_MAP.get(sym, ""),
-            "last_price": _safe_float(close.iloc[-1], 2),
-            "regime": regime_val,
-            "regime_label": _regime_label(regime_val),
-            "overextension": overext_val,
-            "overext_label": _overext_label(overext_val, threshold),
-            "capital_flow_z": flow_val,
-            "flow_label": _flow_label(flow_val),
-            "sma_value": _safe_float(basis.iloc[-1], 2),
-        })
+            regime_val = int(regime.iloc[-1])
+            overext_val = _safe_float(overext.iloc[-1])
+            basis = close.rolling(params["sma_len"], min_periods=1).mean()
 
-    results.sort(key=lambda x: x["regime"], reverse=True)
-    _cache_set(cache_key, results)
-    return results
+            results.append({
+                "symbol": sym,
+                "asset": name,
+                "category": TICKER_CATEGORY_MAP.get(sym, ""),
+                "last_price": _safe_float(close.iloc[-1], 2),
+                "regime": regime_val,
+                "regime_label": _regime_label(regime_val),
+                "overextension": overext_val,
+                "overext_label": _overext_label(overext_val, threshold),
+                "capital_flow_z": flow_val,
+                "flow_label": _flow_label(flow_val),
+                "sma_value": _safe_float(basis.iloc[-1], 2),
+            })
+
+        results.sort(key=lambda x: x["regime"], reverse=True)
+        _cache_set(cache_key, results)
+        return results
+    except Exception:
+        logger.exception(
+            "Failed to compute regime summary timeframe=%s overext_mode=%s",
+            timeframe,
+            overext_mode,
+        )
+        return []
 
 
 # ── Public API: detail ───────────────────────────────────────────────
@@ -395,74 +403,83 @@ def get_regime_detail(
     if cached is not None:
         return cached
 
-    params = TIMEFRAME_PARAMS[timeframe]
-    data_map = _fetch_for_timeframe(conn, [symbol], timeframe)
-    if symbol not in data_map:
-        return None
+    try:
+        params = TIMEFRAME_PARAMS[timeframe]
+        data_map = _fetch_for_timeframe(conn, [symbol], timeframe)
+        if symbol not in data_map:
+            return None
 
-    df = data_map[symbol]
-    close = df["adj_close"]
-    high = df["high"]
-    low = df["low"]
-    volume = df["volume"]
+        df = data_map[symbol]
+        close = df["adj_close"]
+        high = df["high"]
+        low = df["low"]
+        volume = df["volume"]
 
-    regime = _compute_regime(close, params["sma_len"], params["neutral_bw"])
-    overext, threshold = _compute_overextension(
-        close, high, low,
-        params["sma_len"], overext_mode,
-        params["stdev_len"], params["atr_len"],
-    )
-
-    has_volume = volume.sum() > 0
-    if has_volume:
-        flow_z = _compute_capital_flows(
-            close, volume, params["flow_sma"], params["flow_z_len"],
+        regime = _compute_regime(close, params["sma_len"], params["neutral_bw"])
+        overext, threshold = _compute_overextension(
+            close, high, low,
+            params["sma_len"], overext_mode,
+            params["stdev_len"], params["atr_len"],
         )
-    else:
-        flow_z = pd.Series(np.nan, index=close.index)
 
-    basis = close.rolling(params["sma_len"], min_periods=1).mean()
+        has_volume = volume.sum() > 0
+        if has_volume:
+            flow_z = _compute_capital_flows(
+                close, volume, params["flow_sma"], params["flow_z_len"],
+            )
+        else:
+            flow_z = pd.Series(np.nan, index=close.index)
 
-    fmt = "%Y-%m-%d %H:%M" if timeframe == "4h" else "%Y-%m-%d"
+        basis = close.rolling(params["sma_len"], min_periods=1).mean()
 
-    # Build tail series
-    tail_idx = close.tail(lookback_bars).index
+        fmt = "%Y-%m-%d %H:%M" if timeframe == "4h" else "%Y-%m-%d"
 
-    price_series = [
-        {"date": idx.strftime(fmt), "close": _safe_float(close.at[idx], 2), "sma": _safe_float(basis.at[idx], 2)}
-        for idx in tail_idx
-        if pd.notna(close.at[idx])
-    ]
-    regime_series = [
-        {"date": idx.strftime(fmt), "value": int(regime.at[idx])}
-        for idx in tail_idx
-        if pd.notna(regime.at[idx])
-    ]
-    overext_series = [
-        {"date": idx.strftime(fmt), "value": _safe_float(overext.at[idx])}
-        for idx in tail_idx
-        if pd.notna(overext.at[idx]) and _safe_float(overext.at[idx]) is not None
-    ]
-    flow_series = [
-        {"date": idx.strftime(fmt), "value": _safe_float(flow_z.at[idx])}
-        for idx in tail_idx
-        if pd.notna(flow_z.at[idx]) and _safe_float(flow_z.at[idx]) is not None
-    ]
+        # Build tail series
+        tail_idx = close.tail(lookback_bars).index
 
-    result = {
-        "symbol": symbol,
-        "asset": ticker_map[symbol],
-        "last_price": _safe_float(close.iloc[-1], 2),
-        "regime_current": int(regime.iloc[-1]),
-        "overext_current": _safe_float(overext.iloc[-1]),
-        "overext_threshold": threshold,
-        "flow_z_current": _safe_float(flow_z.iloc[-1]) if has_volume else None,
-        "flow_threshold": FLOW_THRESHOLD,
-        "price_series": price_series,
-        "regime_series": regime_series,
-        "overext_series": overext_series,
-        "flow_series": flow_series,
-    }
+        price_series = [
+            {"date": idx.strftime(fmt), "close": _safe_float(close.at[idx], 2), "sma": _safe_float(basis.at[idx], 2)}
+            for idx in tail_idx
+            if pd.notna(close.at[idx])
+        ]
+        regime_series = [
+            {"date": idx.strftime(fmt), "value": int(regime.at[idx])}
+            for idx in tail_idx
+            if pd.notna(regime.at[idx])
+        ]
+        overext_series = [
+            {"date": idx.strftime(fmt), "value": _safe_float(overext.at[idx])}
+            for idx in tail_idx
+            if pd.notna(overext.at[idx]) and _safe_float(overext.at[idx]) is not None
+        ]
+        flow_series = [
+            {"date": idx.strftime(fmt), "value": _safe_float(flow_z.at[idx])}
+            for idx in tail_idx
+            if pd.notna(flow_z.at[idx]) and _safe_float(flow_z.at[idx]) is not None
+        ]
 
-    _cache_set(cache_key, result)
-    return result
+        result = {
+            "symbol": symbol,
+            "asset": ticker_map[symbol],
+            "last_price": _safe_float(close.iloc[-1], 2),
+            "regime_current": int(regime.iloc[-1]),
+            "overext_current": _safe_float(overext.iloc[-1]),
+            "overext_threshold": threshold,
+            "flow_z_current": _safe_float(flow_z.iloc[-1]) if has_volume else None,
+            "flow_threshold": FLOW_THRESHOLD,
+            "price_series": price_series,
+            "regime_series": regime_series,
+            "overext_series": overext_series,
+            "flow_series": flow_series,
+        }
+
+        _cache_set(cache_key, result)
+        return result
+    except Exception:
+        logger.exception(
+            "Failed to compute regime detail symbol=%s timeframe=%s overext_mode=%s",
+            symbol,
+            timeframe,
+            overext_mode,
+        )
+        return None
