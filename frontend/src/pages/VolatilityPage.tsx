@@ -382,11 +382,6 @@ export function VolatilityPage() {
 
       {/* Summary cards */}
       <section id="vol-section-cards">
-      {s.as_of_date && (
-        <div style={{ fontSize: 11, color: "var(--text-muted)", marginBottom: 8, textAlign: "right" }}>
-          Data as of {s.as_of_date}
-        </div>
-      )}
       <div className="summary-cards" style={{ marginBottom: 24 }}>
         <div className="card">
           <div className="card-icon" style={{ color: oscColor(s.vix_oscillator) ?? "var(--text-muted)" }}>

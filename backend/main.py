@@ -67,4 +67,16 @@ async def unhandled_exception_handler(request: Request, exc: Exception):
 
 @app.get("/api/health")
 def health_check():
-    return {"status": "ok"}
+    from backend.database import get_conn
+    last_date = None
+    try:
+        conn = get_conn()
+        with conn.cursor() as cur:
+            cur.execute("SELECT MAX(date) FROM daily_prices")
+            row = cur.fetchone()
+            if row and row[0]:
+                last_date = row[0]
+        conn.close()
+    except Exception:
+        pass
+    return {"status": "ok", "last_data_date": last_date}

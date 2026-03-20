@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { useMacroHero, useMacroHistory } from "../../hooks/useMacroData";
-import { formatDate } from "../../utils/formatters";
 import { cssVar } from "../../utils/cssVar";
 import type {
   MacroHeroResponse,
@@ -457,10 +456,6 @@ export function MacroHeroCard() {
       {/* Sparkline chart */}
       {showHistory && <UnifiedSparkline history={history} />}
 
-      {/* Footer */}
-      <div className="ms-footer">
-        <span className="ms-date">as of {formatDate(hero.as_of_date)}</span>
-      </div>
     </div>
   );
 }

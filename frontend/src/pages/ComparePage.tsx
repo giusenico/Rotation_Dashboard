@@ -4,7 +4,7 @@ import { useComparison } from "../hooks/useCompareData";
 import { useTickersRaw } from "../hooks/usePriceData";
 import { LoadingSpinner } from "../components/common/LoadingSpinner";
 import { cssVar } from "../utils/cssVar";
-import { formatPct, formatDate } from "../utils/formatters";
+import { formatPct } from "../utils/formatters";
 import type { CompareAssetInfo, ComparePayload, RRGPosition } from "../types/compare";
 import { ArrowLeftRight, TrendingUp, TrendingDown, ChevronDown } from "lucide-react";
 
@@ -804,12 +804,6 @@ export function ComparePage() {
               <RRGQuadrantMini positions={comparison.rrg_positions} symbols={symbols} />
             )}
 
-            {/* Date footer */}
-            {comparison.as_of_date && (
-              <div className="cmp-date-footer">
-                Data as of {formatDate(comparison.as_of_date)}
-              </div>
-            )}
           </div>
         </div>
       )}

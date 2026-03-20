@@ -2,6 +2,8 @@ import { useRef, useEffect, useCallback, useState } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 import { Menu } from "lucide-react";
 import { ThemeToggle } from "./ThemeToggle";
+import { useLastDataDate } from "../../hooks/useLastDataDate";
+import { formatDate } from "../../utils/formatters";
 
 const pageTitles: Record<string, string> = {
   "/": "Dashboard",
@@ -181,6 +183,7 @@ export function Header({ onMenuClick }: { onMenuClick: () => void }) {
   const location = useLocation();
   const showTopTabs = topTabRoutes.has(location.pathname);
   const title = pageTitles[location.pathname] ?? "Rotation Dashboard";
+  const lastDate = useLastDataDate();
 
   return (
     <header className="header">
@@ -190,7 +193,12 @@ export function Header({ onMenuClick }: { onMenuClick: () => void }) {
 
       {showTopTabs ? <TabBar /> : <h1 className="header-title">{title}</h1>}
 
-      <ThemeToggle />
+      <div className="header-right">
+        {lastDate && (
+          <span className="header-data-date">Data as of {formatDate(lastDate)}</span>
+        )}
+        <ThemeToggle />
+      </div>
     </header>
   );
 }

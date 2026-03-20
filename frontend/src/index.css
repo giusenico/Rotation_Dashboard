@@ -297,6 +297,18 @@ a:hover {
   color: #fff;
 }
 
+/* ── Header right group (date + theme toggle) ────────────────── */
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.header-data-date {
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
 /* ── Theme Toggle ─────────────────────────────────────────────── */
 .theme-toggle {
   display: flex;
