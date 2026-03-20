@@ -252,9 +252,6 @@ export function DashboardPage() {
                   {formatPct(summary?.sp500_return_ytd)}
                 </span>
               )}
-              {summary?.latest_date && (
-                <span className="card-secondary">as of {formatDate(summary.latest_date)}</span>
-              )}
             </div>
           </div>
 
