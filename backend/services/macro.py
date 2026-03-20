@@ -695,7 +695,9 @@ def _compute_macro_hero(conn, period: int = DEFAULT_LOOKBACK) -> dict:
     topk = _topk_churn(prices, period, k=3)
 
     # 7. Composite score + regime (rolling-normalised dominance)
-    dom_norm_series = _dominance_series_normalised(prices, period)
+    # Always use DEFAULT_LOOKBACK for regime classification so it stays
+    # stable regardless of the tactical period the user selects.
+    dom_norm_series = _dominance_series_normalised(prices, DEFAULT_LOOKBACK)
     dom_norm_current = float(dom_norm_series.iloc[-1]) if not np.isnan(dom_norm_series.iloc[-1]) else 0.0
     composite = _compute_composite_score(dom_norm_current, ma_state, z_score)
     regime = _classify_regime(composite)
