@@ -705,6 +705,12 @@ a:hover {
   font-size: 10px;
   color: var(--text-muted);
 }
+.dash-signals-more {
+  font-size: 10px;
+  font-weight: 600;
+  opacity: 0.8;
+  padding-top: 2px;
+}
 .dash-signal-chip--sm {
   font-size: 10px;
   padding: 2px 6px;

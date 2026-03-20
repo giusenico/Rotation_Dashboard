@@ -140,11 +140,16 @@ function SignalsStrip({ regimeData }: { regimeData: RegimeSummaryEntry[] }) {
               <span className="dash-signals-col-count" style={{ color: col.color }}>{col.items.length}</span>
             </div>
             <div className="dash-signals-col-list">
-              {col.items.length > 0 ? col.items.map((e) => (
-                <span key={e.symbol} className="dash-signal-chip dash-signal-chip--sm" style={{ background: col.bg, color: col.color }}>
-                  {e.symbol}
-                </span>
-              )) : (
+              {col.items.length > 0 ? (<>
+                {col.items.slice(0, 4).map((e) => (
+                  <span key={e.symbol} className="dash-signal-chip dash-signal-chip--sm" style={{ background: col.bg, color: col.color }}>
+                    {e.symbol}
+                  </span>
+                ))}
+                {col.items.length > 4 && (
+                  <span className="dash-signals-more" style={{ color: col.color }}>+{col.items.length - 4} more</span>
+                )}
+              </>) : (
                 <span className="dash-signals-col-empty">&mdash;</span>
               )}
             </div>
