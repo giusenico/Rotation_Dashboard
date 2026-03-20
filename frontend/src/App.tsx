@@ -1,5 +1,6 @@
 import { lazy, Suspense } from "react";
 import { createBrowserRouter, RouterProvider, Link } from "react-router-dom";
+import { Analytics } from "@vercel/analytics/react";
 import { Layout } from "./components/layout/Layout";
 import { CompareProvider } from "./hooks/useCompare";
 import { DashboardPage } from "./pages/DashboardPage";
@@ -48,6 +49,7 @@ export default function App() {
   return (
     <CompareProvider>
       <RouterProvider router={router} />
+      <Analytics />
     </CompareProvider>
   );
 }
