@@ -4,7 +4,7 @@ import { useSectorRankings, useCrossAssetRankings } from "../hooks/useRRGData";
 import { useOBVStructure } from "../hooks/useFlowData";
 import { useRegimeSummary } from "../hooks/useRegimeData";
 import { MacroHeroCard } from "../components/charts/MacroHeroCard";
-import { formatPct, formatDate } from "../utils/formatters";
+import { formatPct } from "../utils/formatters";
 import { Link } from "react-router-dom";
 import type { RankingEntry } from "../types/rrg";
 import type { RegimeSummaryEntry } from "../types/regime";
