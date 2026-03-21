@@ -21,6 +21,9 @@ frontend/dist/
 .DS_Store
 Thumbs.db
 
+# Notebooks
+*.ipynb
+
 # IDE
 .vscode/
 .idea/

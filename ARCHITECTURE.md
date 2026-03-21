@@ -2,26 +2,25 @@
 
 ## Overview
 
-The Rotation Dashboard is a full-stack application for analysing sector rotation and cross-asset relative strength. It fetches daily and intraday market data, computes Relative Rotation Graph (RRG) metrics and OBV structure scores, and presents them through an interactive web interface.
-
-The system is composed of three layers:
+Full-stack application for sector rotation and cross-asset relative strength analysis. Three layers: automated data pipeline, FastAPI backend with computation engines, and React frontend.
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │                      DATA PIPELINE                              │
-│  GitHub Actions (cron) → fetch / update scripts → Supabase PG   │
+│  GitHub Actions (cron) → fetch / compute scripts → Supabase PG  │
 └──────────────────────────────┬──────────────────────────────────┘
                                │
                                ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │                      BACKEND (FastAPI)                           │
-│  Pool → Services (RRG, OBV, Prices, Tickers) → REST API        │
+│  Pool → Services (RRG, OBV, Regime, Vol, Macro, Compare) → API  │
 └──────────────────────────────┬──────────────────────────────────┘
                                │
                                ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │                    FRONTEND (React + Plotly)                     │
-│  Dashboard │ RRG │ Price Explorer │ Rankings │ OBV Structure    │
+│  Dashboard │ RRG │ Capital Flow │ Regime │ Volatility │ Compare │
+│  Price Explorer                                                  │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -29,18 +28,20 @@ The system is composed of three layers:
 
 ## 1. Data Pipeline
 
-**Purpose:** Collect and store OHLCV data for 30 financial instruments (11 sector ETFs, 18 cross-asset ETFs, 1 benchmark).
+**Purpose:** Collect, store, and pre-compute metrics for 35 instruments.
 
 | Component | File | Role |
 |-----------|------|------|
-| Config | `config.py` | Single source of truth for all ticker symbols, categories, and DB connection |
+| Config | `config.py` | Single source of truth: tickers, categories, DB URL |
 | Daily fetcher | `scripts/fetch_data.py` | Downloads daily OHLCV from Yahoo Finance, upserts into PostgreSQL |
-| Intraday fetcher | `scripts/fetch_intraday.py` | Fetches 1h data, resamples to 4h bars, upserts into PostgreSQL |
+| Intraday fetcher | `scripts/fetch_intraday.py` | Fetches 1h data, resamples to 4h bars, upserts |
 | OBV updater | `scripts/update_flow.py` | Computes daily OBV structure metrics for all cross-asset ETFs |
-| Initialiser | `scripts/init_db.py` | Creates the database schema and seeds metadata (categories + ticker info) |
-| Daily scheduler | `.github/workflows/daily_fetch.yml` | GitHub Actions cron, Mon–Fri 22:00 UTC: fetch_data.py → update_flow.py |
-| Intraday scheduler | `.github/workflows/intraday_fetch.yml` | GitHub Actions cron, 3×/day: fetch_intraday.py |
-| Schema | `db/schema.sql` | PostgreSQL DDL — 5 tables |
+| Macro updater | `scripts/update_macro.py` | Pre-computes macro risk-on/off hero + history, stores as JSONB |
+| Initialiser | `scripts/init_db.py` | Creates schema and seeds metadata (categories + tickers) |
+| OBV backfill | `scripts/backfill_obv.py` | One-time historical OBV computation |
+| Daily cron | `.github/workflows/daily_fetch.yml` | Mon–Fri 22:00 UTC: fetch → OBV → macro |
+| Intraday cron | `.github/workflows/intraday_fetch.yml` | 3×/day (14:00, 18:00, 22:00 UTC) |
+| Schema | `db/schema.sql` | PostgreSQL DDL — 6 tables |
 
 ### Data flow
 
@@ -52,45 +53,56 @@ Yahoo Finance API
        │  psycopg2 INSERT ... ON CONFLICT DO UPDATE
        ▼
   Supabase PostgreSQL
-       │
-       ├── asset_categories (6 rows)
-       ├── tickers (30 rows)
-       ├── daily_prices (~73K rows, PK: symbol + date)
+       ├── asset_categories (8 rows)
+       ├── tickers (35 rows)
+       ├── daily_prices (~80K+ rows, PK: symbol + date)
        ├── intraday_prices_4h (PK: symbol + datetime)
-       └── obv_daily_metrics (~29K rows, PK: date + symbol)
+       ├── obv_daily_metrics (PK: date + symbol)
+       └── macro_daily_cache (PK: date + key, JSONB payloads)
 ```
 
 ### Key design decisions
 
-- **Incremental fetches** — only downloads data since the last stored date per ticker.
-- **Idempotent writes** — composite primary keys and `ON CONFLICT DO UPDATE` ensure upsert semantics.
-- **10 years of history** — configurable via `HISTORY_YEARS` in `config.py`.
+- **Incremental fetches** — only downloads data since the last stored date per ticker
+- **Idempotent writes** — composite PKs + `ON CONFLICT DO UPDATE` ensure upsert semantics
+- **16 years of history** — configurable via `HISTORY_YEARS` in `config.py`
+- **Macro pre-computation** — hero snapshots for periods [7, 14, 21, 63] and history lookback [300] stored as JSONB to avoid expensive on-the-fly computation
 
 ---
 
 ## 2. Backend (FastAPI)
 
-**Purpose:** Compute RRG and OBV metrics and serve pre-processed data via a REST API.
+**Purpose:** Compute analytical metrics and serve pre-processed data via REST API.
 
 ### Directory structure
 
 ```
 backend/
-├── main.py              ← FastAPI app, CORS middleware, DB pool lifecycle
-├── config.py            ← Imports from root config.py, adds CORS/cache settings
+├── main.py              ← FastAPI app, CORS, DB pool lifecycle, exception handler
+├── config.py            ← Imports from root config + CORS/cache settings
 ├── database.py          ← psycopg2 ThreadedConnectionPool + get_db dependency
 ├── models/
 │   └── schemas.py       ← Pydantic response models
+├── utils/
+│   └── params.py        ← Shared parameter parsing (symbol lists)
 ├── services/
-│   ├── rrg.py           ← RRG computation engine (pandas)
+│   ├── rrg.py           ← RRG engine (JdK RS-Ratio/Momentum)
 │   ├── flow.py          ← OBV structure engine (compute + persist + cache)
 │   ├── prices.py        ← Price queries, returns, drawdown, correlation
+│   ├── regime.py        ← Market regime engine (regime + overextension + flows)
+│   ├── volatility.py    ← VIX oscillator + per-ticker price oscillator engine
+│   ├── macro.py         ← Macro risk-on/off engine
+│   ├── compare.py       ← Asset comparison engine
 │   └── tickers.py       ← Ticker/category metadata queries
 └── routers/
-    ├── rrg.py           ← /api/rrg/* endpoints
-    ├── flow.py          ← /api/obv/* endpoints
-    ├── prices.py        ← /api/prices/* endpoints
-    └── tickers.py       ← /api/tickers/* endpoints
+    ├── rrg.py           ← /api/rrg/*
+    ├── flow.py          ← /api/obv/*
+    ├── prices.py        ← /api/prices/*
+    ├── regime.py        ← /api/regime/*
+    ├── volatility.py    ← /api/volatility/*
+    ├── macro.py         ← /api/macro/*
+    ├── compare.py       ← /api/compare/*
+    └── tickers.py       ← /api/tickers/*
 ```
 
 ### API endpoints
@@ -100,8 +112,8 @@ backend/
 | Endpoint | Description |
 |----------|-------------|
 | `GET /sectors` | RRG data for 11 Sector ETFs vs S&P 500. Params: `trail_length`, `rs_span`, `momentum_span`, `timeframe` |
-| `GET /cross-asset` | RRG data for 18 Cross-Asset ETFs vs S&P 500. Same params |
-| `GET /rankings/sectors` | Sector tickers ranked by composite score (ratio + momentum) |
+| `GET /cross-asset` | RRG data for 19 Cross-Asset ETFs vs S&P 500. Same params |
+| `GET /rankings/sectors` | Sector tickers ranked by composite score |
 | `GET /rankings/cross-asset` | Cross-asset tickers ranked by composite score |
 
 #### OBV (`/api/obv`)
@@ -116,206 +128,162 @@ backend/
 
 | Endpoint | Description |
 |----------|-------------|
-| `GET /{symbol}` | OHLCV time series for a single ticker. Params: `start_date`, `end_date` |
-| `GET /multi` | Batch price data. Param: `symbols` (comma-separated) |
-| `GET /performance` | Multi-period returns (1W, 1M, 3M, 6M, YTD, 1Y). Param: `symbols` |
+| `GET /{symbol}` | OHLCV time series. Params: `start_date`, `end_date` |
+| `GET /multi` | Batch price data. Param: `symbols` |
+| `GET /performance` | Multi-period returns (1W–1Y). Param: `symbols` |
 | `GET /{symbol}/drawdown` | Drawdown-from-peak series |
 | `GET /correlation` | Pairwise correlation matrix. Params: `symbols`, `lookback_days` |
-| `GET /dashboard/summary` | Dashboard overview (leader tickers, S&P 500 YTD, latest date) |
+| `GET /dashboard/summary` | Dashboard overview (leaders, S&P YTD, latest date) |
 
-#### Tickers (`/api/tickers`)
+#### Regime (`/api/regime`)
 
 | Endpoint | Description |
 |----------|-------------|
-| `GET /` | All tickers with category metadata. Optional filter: `category` |
-| `GET /categories` | All asset categories |
-| `GET /{symbol}` | Single ticker detail |
+| `GET /summary` | Regime + overextension + flows for all tickers. Params: `timeframe`, `overext_mode` |
+| `GET /detail/{symbol}` | Regime time-series for single ticker |
+
+#### Volatility (`/api/volatility`)
+
+| Endpoint | Description |
+|----------|-------------|
+| `GET /summary` | VIX oscillator latest values. Params: `window` |
+| `GET /detail` | VIX oscillator time-series + backtest. Params: `lookback`, `window` |
+| `GET /structure` | Per-ticker price oscillator for all 30 tickers. Params: `window`, `timeframe` |
+| `GET /ticker/{symbol}` | Single ticker oscillator time-series. Params: `lookback`, `window`, `timeframe` |
+
+#### Macro (`/api/macro`)
+
+| Endpoint | Description |
+|----------|-------------|
+| `GET /hero` | Macro risk-on/off snapshot. Param: `period` (7/14/21/63) |
+| `GET /history` | Macro indicator time-series. Param: `lookback` |
+
+#### Compare (`/api/compare`)
+
+| Endpoint | Description |
+|----------|-------------|
+| `GET /` | Side-by-side comparison for 2–5 tickers. Params: `symbols`, `lookback` |
 
 #### Health
 
 | Endpoint | Description |
 |----------|-------------|
-| `GET /api/health` | Returns `{"status": "ok"}` |
-
-### RRG computation algorithm
-
-The core algorithm in `backend/services/rrg.py` computes JdK RS-Ratio and RS-Momentum:
-
-```
-1. Fetch adj_close prices for all tickers + benchmark
-2. RS = (ticker_price / (benchmark_price / 100)).ewm(span=20).mean()
-3. Ratio = 100 + (RS - RS.mean()) / RS.std()
-4. Momentum_pct = Ratio.pct_change().ewm(span=10).mean()
-5. Momentum = 100 + Momentum_pct / Momentum_pct.std()
-```
-
-Values oscillate around 100. Tickers are classified into four quadrants:
-
-| Quadrant | Condition | Meaning |
-|----------|-----------|---------|
-| **Leading** | Ratio > 100, Momentum > 100 | Outperforming and gaining strength |
-| **Weakening** | Ratio > 100, Momentum < 100 | Outperforming but losing strength |
-| **Lagging** | Ratio < 100, Momentum < 100 | Underperforming and losing strength |
-| **Improving** | Ratio < 100, Momentum > 100 | Underperforming but gaining strength |
+| `GET /api/health` | Returns `{"status": "ok", "last_data_date": "..."}` |
 
 ### Caching
 
-RRG and OBV results are cached in-memory with a configurable TTL (default 1 hour, set via `CACHE_TTL` env var). Cache keys include the full parameter set.
+RRG, OBV, and regime results are cached in-memory with configurable TTL (default 1h, `CACHE_TTL` env var). Macro data is pre-computed and stored in `macro_daily_cache` table.
 
 ### Database connection
 
-Uses `psycopg2.pool.ThreadedConnectionPool` (2–10 connections). The pool is created on app startup and closed on shutdown via FastAPI's lifespan context manager.
+`psycopg2.pool.ThreadedConnectionPool` (2–10 connections). Pool created on startup, closed on shutdown via FastAPI lifespan context manager.
 
 ---
 
 ## 3. Frontend (React + Vite + TypeScript)
-
-**Purpose:** Interactive, professional dashboard for investors and analysts.
 
 ### Directory structure
 
 ```
 frontend/src/
 ├── main.tsx                    ← Entry point (QueryClient, ThemeProvider)
-├── App.tsx                     ← Router configuration (5 pages, 6 routes)
+├── App.tsx                     ← Router (7 pages, 10 routes)
 ├── index.css                   ← Global styles (CSS custom properties)
-├── api/
-│   ├── client.ts               ← Fetch wrapper with base URL handling
-│   ├── rrg.ts                  ← RRG API calls
-│   ├── flow.ts                 ← Capital flow API calls
-│   ├── prices.ts               ← Price/performance/drawdown API calls
-│   └── tickers.ts              ← Ticker metadata API calls
+├── api/                        ← Fetch wrappers (client, rrg, prices, flow,
+│                                  regime, volatility, macro, compare, tickers)
 ├── components/
 │   ├── layout/
 │   │   ├── Layout.tsx          ← App shell (Sidebar + Header + Outlet)
-│   │   ├── Sidebar.tsx         ← Navigation with icons
+│   │   ├── Sidebar.tsx         ← Grouped navigation
 │   │   ├── Header.tsx          ← Page title + theme toggle
-│   │   ├── ThemeToggle.tsx     ← Dark/light switch button
+│   │   ├── ThemeToggle.tsx     ← Dark/light switch
 │   │   └── VideoBackground.tsx ← Ambient video background
-│   ├── charts/
-│   │   ├── RRGChart.tsx        ← Plotly scatter with trails and quadrants
-│   │   ├── RRGGlossary.tsx     ← RRG glossary/explainer panel
-│   │   ├── FlowGlossary.tsx     ← Capital flow glossary/explainer panel
-│   │   ├── PriceLineChart.tsx  ← Multi-line price chart with range selector
-│   │   ├── DrawdownChart.tsx   ← Filled area drawdown chart
-│   │   ├── CorrelationHeatmap.tsx ← Heatmap of pairwise correlations
-│   │   └── PerformanceBarChart.tsx ← Bar chart of period returns
-│   ├── tables/
-│   │   └── (removed)
+│   ├── charts/                 ← RRGChart, PriceLineChart, DrawdownChart,
+│   │                              CorrelationHeatmap, PerformanceBarChart,
+│   │                              Sparkline, MacroHeroCard, glossaries, modals
 │   └── common/
-│       ├── LoadingSpinner.tsx  ← CSS spinner
-│       └── ErrorBoundary.tsx   ← React error boundary
+│       ├── LoadingSpinner.tsx
+│       ├── ErrorBoundary.tsx
+│       └── CompareBar.tsx      ← Floating compare action bar
 ├── pages/
-│   ├── DashboardPage.tsx       ← Overview: summary cards, mini RRGs, performance
-│   ├── RRGPage.tsx             ← Unified RRG page (sectors + cross-asset tabs)
-│   ├── PriceExplorerPage.tsx   ← Tabbed view: prices, drawdown, correlation, performance
-│   ├── MarketRegimePage.tsx     ← Market regime: regime, overextension, capital flows
-│   └── FlowStructurePage.tsx   ← Capital flow: breadth, heatmap, spreads, ranking table
-├── hooks/
-│   ├── useRRGData.ts           ← React Query hooks for RRG endpoints
-│   ├── useFlowData.ts           ← React Query hooks for OBV endpoints
-│   ├── usePriceData.ts         ← React Query hooks for price endpoints
-│   └── useTheme.ts             ← Theme context consumer
-├── context/
-│   └── ThemeContext.tsx         ← Dark/light provider with CSS variable switching
-├── theme/
-│   ├── dark.ts                 ← Dark palette (Bloomberg-style)
-│   └── light.ts                ← Light palette (clean, minimal)
-├── types/
-│   ├── rrg.ts                  ← RRGPoint, RRGResponse, RankingEntry
-│   ├── flow.ts                 ← OBVStructureEntry, OBVScoreHistory, OBVDetail
-│   └── prices.ts               ← PricePoint, PerformanceEntry, CorrelationResponse, etc.
-└── utils/
-    ├── colors.ts               ← Consistent color map per ticker
-    ├── cssVar.ts               ← CSS variable reader for Plotly configs
-    └── formatters.ts           ← Number/date/percentage formatting
+│   ├── DashboardPage.tsx       ← Overview: summary cards, mini RRGs, macro hero
+│   ├── RRGPage.tsx             ← Unified RRG (sectors + cross-asset tabs)
+│   ├── PriceExplorerPage.tsx   ← Prices, drawdown, correlation, performance
+│   ├── FlowStructurePage.tsx   ← OBV breadth, heatmap, spreads, ranking
+│   ├── MarketRegimePage.tsx    ← Regime, overextension, capital flows
+│   ├── VolatilityPage.tsx      ← VIX oscillators, per-ticker oscillators
+│   └── ComparePage.tsx         ← Side-by-side asset comparison
+├── hooks/                      ← React Query hooks per domain
+├── context/ThemeContext.tsx     ← Dark/light provider
+├── theme/                      ← dark.ts, light.ts
+├── types/                      ← TypeScript interfaces per domain
+└── utils/                      ← colors, formatters, cssVar, rrg helpers
 ```
 
 ### Pages and routing
 
 | Route | Page | Content |
 |-------|------|---------|
-| `/` | Dashboard | Summary cards, mini RRG charts, 1-month performance bar chart |
-| `/rrg` | RRG | Unified RRG page with sector/cross-asset tabs, parameter sliders, rankings |
-| `/rrg/sectors` | RRG | Same page, auto-selects sectors tab |
-| `/rrg/cross-asset` | RRG | Same page, auto-selects cross-asset tab |
-| `/prices` | Price Explorer | Tabbed view with price charts, drawdown, correlation heatmap, performance bars |
-| `/regime` | Market Regime | Regime classification, overextension signals, capital flow analysis |
-| `/obv` | OBV Structure | OBV breadth, rotation score heatmap, spread charts, ranking table |
+| `/` | Dashboard | Summary cards, mini RRG charts, macro risk-on/off hero card |
+| `/rrg` | RRG | Unified page with sector/cross-asset tabs |
+| `/rrg/sectors` | RRG | Auto-selects sectors tab |
+| `/rrg/cross-asset` | RRG | Auto-selects cross-asset tab |
+| `/prices` | Price Explorer | OHLCV charts, drawdown, correlation, performance |
+| `/capital-flow` | Capital Flow | OBV breadth, heatmap, spreads, ranking |
+| `/regime` | Market Regime | Regime classification, overextension, capital flows |
+| `/volatility` | Volatility | VIX structure, per-ticker oscillators, ranking |
+| `/compare` | Compare | Side-by-side comparison (2–5 tickers) |
 
 ### Theme system
 
-Theming is implemented via CSS custom properties on `:root`, toggled by a `data-theme` attribute:
-
-- **Dark theme** (default) — dark backgrounds with coloured accents, financial terminal aesthetic.
-- **Light theme** — clean white backgrounds with subtle borders.
-- Theme preference is persisted in `localStorage`.
-- Switching themes updates CSS variables instantly — no React re-render needed.
+CSS custom properties on `:root`, toggled by `data-theme` attribute. Dark (default, Bloomberg-style) and light themes. Persisted in `localStorage`.
 
 ### Data fetching
 
-Uses **TanStack React Query v5** with:
-- `staleTime: 5 min` — data refreshes in the background every 5 minutes.
-- `gcTime: 30 min` — cached data is kept for 30 minutes.
-- Automatic loading/error state management.
+TanStack React Query v5: `staleTime: 5 min`, `gcTime: 30 min`, automatic loading/error states.
 
 ---
 
-## 4. Technology Stack
+## 4. Tech Stack
 
 | Layer | Technology | Purpose |
 |-------|-----------|---------|
 | Data Pipeline | Python 3.13, yfinance, pandas, psycopg2 | Fetch and store market data |
-| Scheduler | GitHub Actions | Daily + intraday automated data collection |
+| Scheduler | GitHub Actions | Daily + intraday cron |
 | Database | Supabase PostgreSQL | Cloud-hosted persistent storage |
-| Backend | FastAPI, pandas, numpy, scipy, psycopg2, Pydantic | REST API + RRG/OBV computation |
-| Frontend | React 18, TypeScript, Vite | UI framework and build tool |
+| Backend | FastAPI, pandas, numpy, scipy, psycopg2 | REST API + computation engines |
+| Frontend | React 18, TypeScript, Vite | UI framework and build |
 | Charts | Plotly.js (react-plotly.js) | Interactive financial charts |
-| Data fetching | TanStack React Query v5 | Client-side caching and state |
+| Data fetching | TanStack React Query v5 | Client-side caching |
 | Routing | React Router v7 | Client-side navigation |
-| Icons | Lucide React | Lightweight SVG icons |
-| Styling | CSS custom properties | Theming without runtime overhead |
+| Icons | Lucide React | SVG icons |
+| Styling | CSS custom properties | Theme without runtime overhead |
+| Analytics | Vercel Analytics | Usage tracking |
 
 ---
 
 ## 5. Development
 
-### Prerequisites
-
-- Python 3.13+ with a virtual environment
-- Node.js 18+
-- A configured `.env` file with `SUPABASE_DB_URL`
-
 ### Running locally
 
 **Backend** (terminal 1):
-
 ```bash
 source venv/bin/activate
-pip install -r requirements.txt
 uvicorn backend.main:app --reload
 ```
-
-The API is available at `http://localhost:8000`. Verify with `GET /api/health`.
+API at `http://localhost:8000`. Verify: `GET /api/health`.
 
 **Frontend** (terminal 2):
-
 ```bash
-cd frontend
-npm install
-npm run dev
+cd frontend && npm run dev
 ```
-
-The app is available at `http://localhost:5173`. The Vite dev server proxies all `/api/*` requests to the backend on port 8000.
+App at `http://localhost:5173`. Vite proxies `/api/*` to backend on port 8000.
 
 ### Building for production
-
 ```bash
-cd frontend
-npm run build
+cd frontend && npm run build
 ```
-
-The output is in `frontend/dist/` — a static bundle that can be served by any web server or CDN. Set `VITE_API_BASE_URL` to the production backend URL before building.
+Output in `frontend/dist/`. Set `VITE_API_BASE_URL` before building.
 
 ---
 
@@ -341,15 +309,22 @@ The output is in `frontend/dist/` — a static bundle that can be served by any 
               │ symbol (PK)│ │ symbol  (PK) │ │ date     (PK)  │
               │ date   (PK)│ │ datetime(PK) │ │ symbol   (PK)  │
               │ OHLCV +    │ │ OHLCV        │ │ obv_regime     │
-              │ adj_close  │ │              │ │ spread_last    │
-              └────────────┘ └──────────────┘ │ spread_pct     │
-                                              │ momentum_z     │
-                                              │ rotation_score │
+              │ adj_close  │ │              │ │ spread/momentum│
+              └────────────┘ └──────────────┘ │ rotation_score │
                                               └─────────────────┘
+
+              ┌───────────────────┐
+              │ macro_daily_cache │
+              ├───────────────────┤
+              │ date (PK, TEXT)   │
+              │ key  (PK, TEXT)   │
+              │ value (JSONB)     │
+              └───────────────────┘
 ```
 
-- **asset_categories**: 6 rows (Sector ETF, Bond ETF, Equity ETF, Commodity ETF, Crypto ETF, Benchmark)
-- **tickers**: 30 rows (11 sector + 18 cross-asset + 1 benchmark)
-- **daily_prices**: ~73K rows (30 tickers × ~10 years × ~250 trading days). Composite PK `(symbol, date)`
-- **intraday_prices_4h**: 4-hour bars resampled from 1h Yahoo data. Composite PK `(symbol, datetime)`
-- **obv_daily_metrics**: ~29K rows of OBV structure scores. Composite PK `(date, symbol)`
+- **asset_categories**: 8 rows (Sector ETF, Bond ETF, Equity ETF, Commodity ETF, Crypto ETF, Benchmark, Volatility Index, Macro Only)
+- **tickers**: 35 rows (11 sector + 19 cross-asset + 1 benchmark + 2 VIX + 2 macro-only)
+- **daily_prices**: ~80K+ rows. Composite PK `(symbol, date)`. Date stored as TEXT (ISO-8601)
+- **intraday_prices_4h**: 4h bars resampled from 1h Yahoo data. Composite PK `(symbol, datetime)`
+- **obv_daily_metrics**: OBV structure scores. Composite PK `(date, symbol)`
+- **macro_daily_cache**: Pre-computed macro JSON payloads. Composite PK `(date, key)`
