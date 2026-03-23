@@ -24,6 +24,9 @@ Thumbs.db
 # Notebooks
 *.ipynb
 
+# Claude Code
+CLAUDE.md
+
 # IDE
 .vscode/
 .idea/
