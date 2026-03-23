@@ -81,7 +81,7 @@ Tracks **35 instruments** across 8 categories and provides five analytical views
 | Layer | Technology |
 |-------|-----------|
 | Backend | Python 3.13, FastAPI, psycopg2, pandas, numpy, scipy |
-| Frontend | React 18, TypeScript, Vite, React Router v7, Plotly.js |
+| Frontend | React 19, TypeScript, Vite, React Router v7, Plotly.js |
 | Database | Supabase PostgreSQL |
 | Hosting | Render (backend), Vercel (frontend) |
 | CI/CD | GitHub Actions (daily + intraday cron) |

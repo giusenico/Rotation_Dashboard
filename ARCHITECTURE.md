@@ -252,7 +252,7 @@ TanStack React Query v5: `staleTime: 5 min`, `gcTime: 30 min`, automatic loading
 | Scheduler | GitHub Actions | Daily + intraday cron |
 | Database | Supabase PostgreSQL | Cloud-hosted persistent storage |
 | Backend | FastAPI, pandas, numpy, scipy, psycopg2 | REST API + computation engines |
-| Frontend | React 18, TypeScript, Vite | UI framework and build |
+| Frontend | React 19, TypeScript, Vite | UI framework and build |
 | Charts | Plotly.js (react-plotly.js) | Interactive financial charts |
 | Data fetching | TanStack React Query v5 | Client-side caching |
 | Routing | React Router v7 | Client-side navigation |
