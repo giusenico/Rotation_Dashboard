@@ -14,7 +14,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from backend.config import CORS_ORIGINS
 from backend.database import create_pool, close_pool
-from backend.routers import rrg, prices, tickers, flow, regime, volatility, macro, compare
+from backend.routers import rrg, prices, tickers, flow, regime, volatility, macro, compare, psm
 
 logger = logging.getLogger(__name__)
 
@@ -49,6 +49,7 @@ app.include_router(regime.router, prefix="/api/regime", tags=["Regime"])
 app.include_router(volatility.router, prefix="/api/volatility", tags=["Volatility"])
 app.include_router(macro.router, prefix="/api/macro", tags=["Macro"])
 app.include_router(compare.router, prefix="/api/compare", tags=["Compare"])
+app.include_router(psm.router, prefix="/api/psm", tags=["PSM"])
 
 
 @app.exception_handler(Exception)
