@@ -68,3 +68,314 @@ CREATE TABLE IF NOT EXISTS macro_daily_cache (
     value   JSONB   NOT NULL,  -- full API response payload
     PRIMARY KEY (date, key)
 );
+
+-- ============================================================
+-- PSM Framework tables
+-- ============================================================
+
+-- Financial Stress Index daily values (from CSV import)
+CREATE TABLE IF NOT EXISTS fsi_daily (
+    date              DATE    NOT NULL PRIMARY KEY,
+    signal_a          DOUBLE PRECISION,   -- sub-signal component A
+    signal_b          DOUBLE PRECISION,   -- sub-signal component B
+    signal_c          DOUBLE PRECISION,   -- sub-signal component C
+    composite_index   DOUBLE PRECISION    -- weighted composite
+);
+
+-- BTC trend signals daily (from CSV or future API)
+CREATE TABLE IF NOT EXISTS btc_trend_daily (
+    date              DATE    NOT NULL PRIMARY KEY,
+    signal_alpha      DOUBLE PRECISION,   -- conservative trend
+    signal_beta       DOUBLE PRECISION,   -- moderate trend
+    signal_gamma      DOUBLE PRECISION    -- aggressive trend
+);
+
+-- Business cycle state table (upstream: v11 framework notebook, FRED-sourced CLI data)
+-- Monthly cadence, loaded via scripts/load_business_cycle.py
+CREATE TABLE IF NOT EXISTS business_cycle_daily (
+    date                      DATE    NOT NULL PRIMARY KEY,
+    leading_cli               DOUBLE PRECISION,
+    leading_mom3              DOUBLE PRECISION,
+    leading_ann6              DOUBLE PRECISION,
+    leading_diff6             DOUBLE PRECISION,
+    leading_coverage_pct      DOUBLE PRECISION,
+    coincident_cli            DOUBLE PRECISION,
+    coincident_mom3           DOUBLE PRECISION,
+    coincident_ann6           DOUBLE PRECISION,
+    coincident_diff6          DOUBLE PRECISION,
+    coincident_coverage_pct   DOUBLE PRECISION,
+    lagging_cli               DOUBLE PRECISION,
+    lagging_mom3              DOUBLE PRECISION,
+    lagging_ann6              DOUBLE PRECISION,
+    lagging_diff6             DOUBLE PRECISION,
+    lagging_coverage_pct      DOUBLE PRECISION,
+    phase                     TEXT,
+    activity_state            TEXT,
+    phase_strength_score      DOUBLE PRECISION,
+    recession_risk_score      DOUBLE PRECISION,
+    recession_overlay         TEXT,
+    p_recovery                DOUBLE PRECISION,
+    p_expansion               DOUBLE PRECISION,
+    p_downturn                DOUBLE PRECISION,
+    p_slowdown                DOUBLE PRECISION,
+    phase_probability         DOUBLE PRECISION,
+    phase_confidence_score    DOUBLE PRECISION,
+    cycle_sync_score          DOUBLE PRECISION,
+    transition_risk_score     DOUBLE PRECISION,
+    lead_coincident_ann6_gap  DOUBLE PRECISION,
+    headline_state            TEXT,
+    growth_regime             TEXT,
+    macro_stance              TEXT,
+    readable_headline         TEXT
+);
+
+-- PSM daily computed states (one row per date × profile × horizon)
+-- v2: structural_state replaces macro_state; market_state is a new explicit layer
+CREATE TABLE IF NOT EXISTS psm_daily (
+    date                   DATE    NOT NULL,
+    profile                TEXT    NOT NULL,   -- 'Conservative' | 'Moderate' | 'Aggressive'
+    horizon                TEXT    NOT NULL,   -- 'Short term' | 'Mid term' | 'Long term'
+    structural_state       TEXT,               -- 'Defensive' | 'Fragile' | 'Recovery' | 'Expansion'
+    structural_confidence  TEXT,               -- 'Low' | 'Medium' | 'High'
+    market_state           TEXT,               -- 'Risk-Off' | 'Neutral' | 'Risk-On'
+    crypto_state           TEXT,
+    bridge_confidence      TEXT,               -- 'Low' | 'Medium' | 'High'
+    overall_confidence     TEXT,
+    structural_component   DOUBLE PRECISION,
+    market_component       DOUBLE PRECISION,
+    crypto_component       DOUBLE PRECISION,
+    bridge_component       DOUBLE PRECISION,
+    bias_component         DOUBLE PRECISION,
+    penalty_component      DOUBLE PRECISION,
+    boost_component        DOUBLE PRECISION,
+    prelim_score           DOUBLE PRECISION,
+    prelim_state           TEXT,
+    candidate_state        TEXT,
+    setup_class            TEXT,
+    final_state            TEXT,
+    final_score            DOUBLE PRECISION,
+    action_bucket          TEXT,
+    deployment_level       DOUBLE PRECISION,
+    deployment_label       TEXT,
+    sleeve_safety          DOUBLE PRECISION,
+    sleeve_growth          DOUBLE PRECISION,
+    sleeve_tactical        DOUBLE PRECISION,
+    sleeve_cash            DOUBLE PRECISION,
+    bullish_prob           DOUBLE PRECISION,
+    neutral_prob           DOUBLE PRECISION,
+    bearish_prob           DOUBLE PRECISION,
+    recommendation         TEXT,
+    mismatch_note          TEXT,
+    bridge_note            TEXT,
+    upgrade_trigger        TEXT,
+    downgrade_trigger      TEXT,
+    PRIMARY KEY (date, profile, horizon)
+);
+
+-- PSM intermediate layer data (one row per date — all four v2 layers denormalized)
+CREATE TABLE IF NOT EXISTS psm_layers_daily (
+    date                     DATE    NOT NULL PRIMARY KEY,
+    -- Layer 0: Structural (business cycle)
+    structural_state_raw     TEXT,
+    structural_state         TEXT,
+    structural_confidence    TEXT,
+    structural_score_raw     DOUBLE PRECISION,
+    structural_score         DOUBLE PRECISION,
+    structural_quality_score DOUBLE PRECISION,
+    phase                    TEXT,
+    growth_regime            TEXT,
+    macro_stance             TEXT,
+    recession_overlay        TEXT,
+    phase_confidence_score   DOUBLE PRECISION,
+    cycle_sync_score         DOUBLE PRECISION,
+    transition_risk_score    DOUBLE PRECISION,
+    recession_risk_score     DOUBLE PRECISION,
+    -- Layer 1: Market expression
+    fsi_raw                  DOUBLE PRECISION,
+    fsi_oriented             DOUBLE PRECISION,
+    fsi_z                    DOUBLE PRECISION,
+    fsi_slope_20             DOUBLE PRECISION,
+    fsi_score                DOUBLE PRECISION,
+    unified_log              DOUBLE PRECISION,
+    unified_score            DOUBLE PRECISION,
+    delta_to_risk_on         DOUBLE PRECISION,
+    rotation_score           DOUBLE PRECISION,
+    market_regime            TEXT,
+    market_score_raw         DOUBLE PRECISION,
+    market_state_raw         TEXT,
+    market_state             TEXT,
+    market_score             DOUBLE PRECISION,
+    -- Layer 2: Crypto (per-profile)
+    signal_alpha             DOUBLE PRECISION,   -- Conservative BTC trend
+    signal_beta              DOUBLE PRECISION,   -- Moderate BTC trend
+    signal_gamma             DOUBLE PRECISION,   -- Aggressive BTC trend
+    conservative_crypto_score_raw  DOUBLE PRECISION,
+    conservative_crypto_state_raw  TEXT,
+    conservative_crypto_state      TEXT,
+    conservative_crypto_score      DOUBLE PRECISION,
+    moderate_crypto_score_raw      DOUBLE PRECISION,
+    moderate_crypto_state_raw      TEXT,
+    moderate_crypto_state          TEXT,
+    moderate_crypto_score          DOUBLE PRECISION,
+    aggressive_crypto_score_raw    DOUBLE PRECISION,
+    aggressive_crypto_state_raw    TEXT,
+    aggressive_crypto_state        TEXT,
+    aggressive_crypto_score        DOUBLE PRECISION,
+    -- Layer 3: Bridge
+    obv_score                DOUBLE PRECISION,
+    obv_risk_confirmation    DOUBLE PRECISION,
+    beta_btc_to_nasdaq       DOUBLE PRECISION,
+    beta_btc_to_dxy          DOUBLE PRECISION,
+    beta_context_score       DOUBLE PRECISION,
+    rrg_sector_score         DOUBLE PRECISION,
+    rrg_cross_score          DOUBLE PRECISION,
+    rrg_score                DOUBLE PRECISION,
+    bridge_score_raw         DOUBLE PRECISION,
+    bridge_score             DOUBLE PRECISION,
+    bridge_confidence        TEXT
+);
+
+-- PSM policy matrix (pre-computed lookup for all state combinations)
+CREATE TABLE IF NOT EXISTS psm_policy_matrix (
+    profile                TEXT    NOT NULL,
+    horizon                TEXT    NOT NULL,
+    structural_state       TEXT    NOT NULL,
+    crypto_state           TEXT    NOT NULL,
+    bridge_confidence      TEXT    NOT NULL,
+    setup_class            TEXT,
+    final_state            TEXT,
+    final_score            DOUBLE PRECISION,
+    overall_confidence     TEXT,
+    action_bucket          TEXT,
+    deployment_level       DOUBLE PRECISION,
+    deployment_label       TEXT,
+    sleeve_safety          DOUBLE PRECISION,
+    sleeve_growth          DOUBLE PRECISION,
+    sleeve_tactical        DOUBLE PRECISION,
+    sleeve_cash            DOUBLE PRECISION,
+    bullish_prob           DOUBLE PRECISION,
+    neutral_prob           DOUBLE PRECISION,
+    bearish_prob           DOUBLE PRECISION,
+    recommendation         TEXT,
+    mismatch_note          TEXT,
+    bridge_note            TEXT,
+    upgrade_trigger        TEXT,
+    downgrade_trigger      TEXT,
+    PRIMARY KEY (profile, horizon, structural_state, crypto_state, bridge_confidence)
+);
+
+-- ============================================================
+-- Migration v2: align existing deployments to the v2 PSM schema
+-- Idempotent: safe to re-run. For clusters already on v1 only.
+-- ============================================================
+DO $$ BEGIN
+    -- psm_daily v2 additive columns
+    ALTER TABLE psm_daily ADD COLUMN IF NOT EXISTS structural_state TEXT;
+    ALTER TABLE psm_daily ADD COLUMN IF NOT EXISTS structural_confidence TEXT;
+    ALTER TABLE psm_daily ADD COLUMN IF NOT EXISTS market_state TEXT;
+    ALTER TABLE psm_daily ADD COLUMN IF NOT EXISTS structural_component DOUBLE PRECISION;
+    ALTER TABLE psm_daily ADD COLUMN IF NOT EXISTS market_component DOUBLE PRECISION;
+    ALTER TABLE psm_daily ADD COLUMN IF NOT EXISTS crypto_component DOUBLE PRECISION;
+    ALTER TABLE psm_daily ADD COLUMN IF NOT EXISTS bridge_component DOUBLE PRECISION;
+    ALTER TABLE psm_daily ADD COLUMN IF NOT EXISTS bias_component DOUBLE PRECISION;
+    ALTER TABLE psm_daily ADD COLUMN IF NOT EXISTS penalty_component DOUBLE PRECISION;
+    ALTER TABLE psm_daily ADD COLUMN IF NOT EXISTS boost_component DOUBLE PRECISION;
+    ALTER TABLE psm_daily ADD COLUMN IF NOT EXISTS prelim_score DOUBLE PRECISION;
+    ALTER TABLE psm_daily ADD COLUMN IF NOT EXISTS prelim_state TEXT;
+    ALTER TABLE psm_daily ADD COLUMN IF NOT EXISTS candidate_state TEXT;
+
+    -- psm_daily: drop dead v1 columns
+    ALTER TABLE psm_daily DROP COLUMN IF EXISTS macro_state;
+    ALTER TABLE psm_daily DROP COLUMN IF EXISTS stance;
+    -- deployment_level is kept (v2 exposes it as a numeric for UI progress bars)
+
+    -- psm_layers_daily: full rebuild (schema shape fundamentally changed)
+    DROP TABLE IF EXISTS psm_layers_daily CASCADE;
+    CREATE TABLE psm_layers_daily (
+        date                     DATE    NOT NULL PRIMARY KEY,
+        structural_state_raw     TEXT,
+        structural_state         TEXT,
+        structural_confidence    TEXT,
+        structural_score_raw     DOUBLE PRECISION,
+        structural_score         DOUBLE PRECISION,
+        structural_quality_score DOUBLE PRECISION,
+        phase                    TEXT,
+        growth_regime            TEXT,
+        macro_stance             TEXT,
+        recession_overlay        TEXT,
+        phase_confidence_score   DOUBLE PRECISION,
+        cycle_sync_score         DOUBLE PRECISION,
+        transition_risk_score    DOUBLE PRECISION,
+        recession_risk_score     DOUBLE PRECISION,
+        fsi_raw                  DOUBLE PRECISION,
+        fsi_oriented             DOUBLE PRECISION,
+        fsi_z                    DOUBLE PRECISION,
+        fsi_slope_20             DOUBLE PRECISION,
+        fsi_score                DOUBLE PRECISION,
+        unified_log              DOUBLE PRECISION,
+        unified_score            DOUBLE PRECISION,
+        delta_to_risk_on         DOUBLE PRECISION,
+        rotation_score           DOUBLE PRECISION,
+        market_regime            TEXT,
+        market_score_raw         DOUBLE PRECISION,
+        market_state_raw         TEXT,
+        market_state             TEXT,
+        market_score             DOUBLE PRECISION,
+        signal_alpha             DOUBLE PRECISION,
+        signal_beta              DOUBLE PRECISION,
+        signal_gamma             DOUBLE PRECISION,
+        conservative_crypto_score_raw  DOUBLE PRECISION,
+        conservative_crypto_state_raw  TEXT,
+        conservative_crypto_state      TEXT,
+        conservative_crypto_score      DOUBLE PRECISION,
+        moderate_crypto_score_raw      DOUBLE PRECISION,
+        moderate_crypto_state_raw      TEXT,
+        moderate_crypto_state          TEXT,
+        moderate_crypto_score          DOUBLE PRECISION,
+        aggressive_crypto_score_raw    DOUBLE PRECISION,
+        aggressive_crypto_state_raw    TEXT,
+        aggressive_crypto_state        TEXT,
+        aggressive_crypto_score        DOUBLE PRECISION,
+        obv_score                DOUBLE PRECISION,
+        obv_risk_confirmation    DOUBLE PRECISION,
+        beta_btc_to_nasdaq       DOUBLE PRECISION,
+        beta_btc_to_dxy          DOUBLE PRECISION,
+        beta_context_score       DOUBLE PRECISION,
+        rrg_sector_score         DOUBLE PRECISION,
+        rrg_cross_score          DOUBLE PRECISION,
+        rrg_score                DOUBLE PRECISION,
+        bridge_score_raw         DOUBLE PRECISION,
+        bridge_score             DOUBLE PRECISION,
+        bridge_confidence        TEXT
+    );
+
+    -- psm_policy_matrix: rebuild with structural_state PK
+    DROP TABLE IF EXISTS psm_policy_matrix CASCADE;
+    CREATE TABLE psm_policy_matrix (
+        profile                TEXT    NOT NULL,
+        horizon                TEXT    NOT NULL,
+        structural_state       TEXT    NOT NULL,
+        crypto_state           TEXT    NOT NULL,
+        bridge_confidence      TEXT    NOT NULL,
+        setup_class            TEXT,
+        final_state            TEXT,
+        final_score            DOUBLE PRECISION,
+        overall_confidence     TEXT,
+        action_bucket          TEXT,
+        deployment_label       TEXT,
+        sleeve_safety          DOUBLE PRECISION,
+        sleeve_growth          DOUBLE PRECISION,
+        sleeve_tactical        DOUBLE PRECISION,
+        sleeve_cash            DOUBLE PRECISION,
+        bullish_prob           DOUBLE PRECISION,
+        neutral_prob           DOUBLE PRECISION,
+        bearish_prob           DOUBLE PRECISION,
+        recommendation         TEXT,
+        mismatch_note          TEXT,
+        bridge_note            TEXT,
+        upgrade_trigger        TEXT,
+        downgrade_trigger      TEXT,
+        PRIMARY KEY (profile, horizon, structural_state, crypto_state, bridge_confidence)
+    );
+EXCEPTION WHEN OTHERS THEN NULL;
+END $$;
