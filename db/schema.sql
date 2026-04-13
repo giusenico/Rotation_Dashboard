@@ -362,6 +362,7 @@ DO $$ BEGIN
         final_score            DOUBLE PRECISION,
         overall_confidence     TEXT,
         action_bucket          TEXT,
+        deployment_level       DOUBLE PRECISION,
         deployment_label       TEXT,
         sleeve_safety          DOUBLE PRECISION,
         sleeve_growth          DOUBLE PRECISION,
