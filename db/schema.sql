@@ -269,6 +269,78 @@ CREATE TABLE IF NOT EXISTS psm_policy_matrix (
 );
 
 -- ============================================================
+-- Crypto Top 20 by Market Cap (global crypto universe, separate from
+-- `tickers` — CoinGecko-sourced, daily snapshots for historical trend)
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS crypto_assets (
+    id           TEXT    PRIMARY KEY,      -- CoinGecko id (e.g. 'bitcoin')
+    symbol       TEXT    NOT NULL,
+    name         TEXT    NOT NULL,
+    style_bucket TEXT    CHECK (style_bucket IS NULL OR style_bucket IN ('growth', 'safety', 'tactical')),
+    logo_url     TEXT,
+    created_at   TIMESTAMPTZ DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_crypto_assets_style_bucket ON crypto_assets (style_bucket) WHERE style_bucket IS NOT NULL;
+
+CREATE TABLE IF NOT EXISTS crypto_mcap_snapshots (
+    snapshot_date   DATE    NOT NULL,
+    asset_id        TEXT    NOT NULL REFERENCES crypto_assets (id),
+    rank            INT     NOT NULL,
+    market_cap      BIGINT  NOT NULL,
+    price           DOUBLE PRECISION,
+    change_24h      DOUBLE PRECISION,
+    change_7d       DOUBLE PRECISION,
+    volume_24h      BIGINT,
+    PRIMARY KEY (snapshot_date, asset_id)
+);
+CREATE INDEX IF NOT EXISTS idx_crypto_snapshots_date_rank ON crypto_mcap_snapshots (snapshot_date, rank);
+
+INSERT INTO crypto_assets (id, symbol, name, style_bucket) VALUES
+    ('bitcoin',        'BTC',   'Bitcoin',     'safety'),
+    ('ethereum',       'ETH',   'Ethereum',    'growth'),
+    ('solana',         'SOL',   'Solana',      'growth'),
+    ('cardano',        'ADA',   'Cardano',     'growth'),
+    ('avalanche-2',    'AVAX',  'Avalanche',   'growth'),
+    ('polkadot',       'DOT',   'Polkadot',    'growth'),
+    ('near',           'NEAR',  'NEAR Protocol', 'growth'),
+    ('cosmos',         'ATOM',  'Cosmos Hub',  'growth'),
+    ('sui',            'SUI',   'Sui',         'growth'),
+    ('aptos',          'APT',   'Aptos',       'growth'),
+    ('internet-computer', 'ICP', 'Internet Computer', 'growth'),
+    ('hedera-hashgraph', 'HBAR', 'Hedera',     'growth'),
+    ('arbitrum',       'ARB',   'Arbitrum',    'growth'),
+    ('optimism',       'OP',    'Optimism',    'growth'),
+    ('celestia',       'TIA',   'Celestia',    'growth'),
+    ('sei-network',    'SEI',   'Sei',         'growth'),
+    ('ripple',         'XRP',   'XRP',         'tactical'),
+    ('binancecoin',    'BNB',   'BNB',         'tactical'),
+    ('tron',           'TRX',   'TRON',        'tactical'),
+    ('litecoin',       'LTC',   'Litecoin',    'tactical'),
+    ('bitcoin-cash',   'BCH',   'Bitcoin Cash', 'tactical'),
+    ('chainlink',      'LINK',  'Chainlink',   'tactical'),
+    ('uniswap',        'UNI',   'Uniswap',     'tactical'),
+    ('aave',           'AAVE',  'Aave',        'tactical'),
+    ('dogecoin',       'DOGE',  'Dogecoin',    'tactical'),
+    ('shiba-inu',      'SHIB',  'Shiba Inu',   'tactical'),
+    ('pepe',           'PEPE',  'Pepe',        'tactical'),
+    ('dogwifcoin',     'WIF',   'dogwifhat',   'tactical'),
+    ('bonk',           'BONK',  'Bonk',        'tactical'),
+    ('fetch-ai',       'FET',   'Fetch.ai',    'tactical'),
+    ('monero',         'XMR',   'Monero',      'tactical'),
+    ('zcash',          'ZEC',   'Zcash',       'tactical'),
+    ('stellar',        'XLM',   'Stellar',     'tactical'),
+    ('leo-token',      'LEO',   'LEO Token',   'tactical'),
+    ('whitebit',       'WBT',   'WhiteBIT Coin', 'tactical'),
+    ('hyperliquid',    'HYPE',  'Hyperliquid', 'tactical'),
+    ('memecore',       'M',     'MemeCore',    'tactical'),
+    ('canton-network', 'CC',    'Canton',      'growth')
+ON CONFLICT (id) DO UPDATE SET
+    symbol       = EXCLUDED.symbol,
+    name         = EXCLUDED.name,
+    style_bucket = EXCLUDED.style_bucket;
+
+-- ============================================================
 -- Migration v2: align existing deployments to the v2 PSM schema
 -- Idempotent: safe to re-run. For clusters already on v1 only.
 -- ============================================================
