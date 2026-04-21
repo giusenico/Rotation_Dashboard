@@ -112,6 +112,8 @@ class OBVStructureEntry(BaseModel):
     return_3m: float | None = None
     return_6m: float | None = None
     return_ytd: float | None = None
+    market_cap: int | None = None
+    style_bucket: str | None = None
     spread_series: list[OBVSpreadPoint]
 
 

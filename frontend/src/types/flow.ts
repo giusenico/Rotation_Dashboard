@@ -3,6 +3,8 @@ export interface OBVSpreadPoint {
   value: number;
 }
 
+export type StyleBucket = "growth" | "safety" | "tactical";
+
 export interface OBVStructureEntry {
   asset: string;
   symbol: string;
@@ -14,6 +16,8 @@ export interface OBVStructureEntry {
   return_3m: number | null;
   return_6m: number | null;
   return_ytd: number | null;
+  market_cap: number | null;
+  style_bucket: StyleBucket | null;
   spread_series: OBVSpreadPoint[];
 }
 

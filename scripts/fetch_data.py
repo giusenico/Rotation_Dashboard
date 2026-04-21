@@ -105,6 +105,53 @@ def fetch_and_store(conn, symbol: str, start: str, end: str) -> int:
     return len(values)
 
 
+def _fetch_market_cap(symbol: str) -> int | None:
+    """
+    Return market cap / AUM for a symbol via yfinance.
+
+    Tries `marketCap` first (crypto, stocks), falls back to `totalAssets` (ETFs).
+    Returns None on failure — caller upserts NULL, which excludes the ticker
+    from mcap-ranked surfaces without breaking other queries.
+    """
+    try:
+        info = yf.Ticker(symbol).info or {}
+    except Exception as exc:
+        print(f"  [warn] {symbol}: .info fetch failed ({exc})")
+        return None
+
+    for key in ("marketCap", "totalAssets"):
+        value = info.get(key)
+        if value is not None:
+            try:
+                return int(value)
+            except (TypeError, ValueError):
+                continue
+    return None
+
+
+def fetch_and_store_market_caps(symbols: list[str]) -> int:
+    """Update `tickers.market_cap` for the given symbols. Returns rows updated."""
+    updated = 0
+    conn = connect()
+    try:
+        with conn.cursor() as cur:
+            for i, sym in enumerate(symbols, 1):
+                mcap = _fetch_market_cap(sym)
+                cur.execute(
+                    "UPDATE tickers SET market_cap = %s WHERE symbol = %s",
+                    (mcap, sym),
+                )
+                if mcap is not None:
+                    updated += 1
+                    print(f"  [{i}/{len(symbols)}] {sym} mcap={mcap:,}")
+                else:
+                    print(f"  [{i}/{len(symbols)}] {sym} mcap=NULL")
+        conn.commit()
+    finally:
+        conn.close()
+    return updated
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(
         description="Fetch daily market data and store it in Supabase PostgreSQL."
@@ -113,6 +160,11 @@ def main() -> None:
         "--full",
         action="store_true",
         help="Force a full historical fetch (ignores existing data).",
+    )
+    parser.add_argument(
+        "--mcaps-only",
+        action="store_true",
+        help="Skip OHLCV; only refresh tickers.market_cap via yfinance .info.",
     )
     args = parser.parse_args()
 
@@ -125,6 +177,12 @@ def main() -> None:
     total_inserted = 0
     errors = 0
     symbols = list(ALL_TICKERS.keys())
+
+    if args.mcaps_only:
+        print(f"Refreshing market_cap for {len(symbols)} tickers ...\n")
+        updated = fetch_and_store_market_caps(symbols)
+        print(f"\nDone. {updated}/{len(symbols)} tickers updated with mcap.")
+        return
 
     print(f"Fetching data for {len(symbols)} tickers ...")
     print(f"Mode: {'FULL' if args.full else 'INCREMENTAL'}")
@@ -169,6 +227,14 @@ def main() -> None:
                 pass
 
     print(f"\nDone. {total_inserted} total rows inserted, {errors} errors.")
+
+    print(f"\nRefreshing market_cap for {len(symbols)} tickers ...")
+    try:
+        updated = fetch_and_store_market_caps(symbols)
+        print(f"  {updated}/{len(symbols)} updated with mcap.")
+    except Exception as exc:
+        print(f"  [ERROR] market_cap refresh failed: {exc}")
+
     if errors:
         sys.exit(1)
 

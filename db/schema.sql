@@ -17,12 +17,16 @@ CREATE TABLE IF NOT EXISTS asset_categories (
 
 -- Metadata for each tracked ticker
 CREATE TABLE IF NOT EXISTS tickers (
-    symbol      TEXT    PRIMARY KEY,
-    name        TEXT    NOT NULL,
-    category_id INTEGER NOT NULL REFERENCES asset_categories (id),
-    currency    TEXT,
-    exchange    TEXT
+    symbol       TEXT    PRIMARY KEY,
+    name         TEXT    NOT NULL,
+    category_id  INTEGER NOT NULL REFERENCES asset_categories (id),
+    currency     TEXT,
+    exchange     TEXT,
+    market_cap   BIGINT,                        -- AUM for ETFs, mcap for crypto; updated daily by fetch_data.py
+    style_bucket TEXT CHECK (style_bucket IS NULL OR style_bucket IN ('growth', 'safety', 'tactical'))
 );
+CREATE INDEX IF NOT EXISTS idx_tickers_style_bucket ON tickers (style_bucket) WHERE style_bucket IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_tickers_market_cap   ON tickers (market_cap DESC NULLS LAST) WHERE market_cap IS NOT NULL;
 
 -- Daily OHLCV price data
 CREATE TABLE IF NOT EXISTS daily_prices (

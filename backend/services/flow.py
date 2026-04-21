@@ -107,6 +107,23 @@ def invalidate_cache() -> None:
 
 # ── Data fetching ─────────────────────────────────────────────────────
 
+def _fetch_ticker_metadata(
+    conn, symbols: list[str]
+) -> dict[str, dict]:
+    """Return {symbol: {market_cap, style_bucket}} for the given symbols."""
+    if not symbols:
+        return {}
+    placeholders = ",".join(["%s"] * len(symbols))
+    query = f"SELECT symbol, market_cap, style_bucket FROM tickers WHERE symbol IN ({placeholders})"
+    with conn.cursor() as cur:
+        cur.execute(query, symbols)
+        rows = cur.fetchall()
+    return {
+        sym: {"market_cap": mcap, "style_bucket": bucket}
+        for sym, mcap, bucket in rows
+    }
+
+
 def _fetch_close_volume(conn, symbols: list[str]) -> dict[str, pd.DataFrame]:
     """Fetch daily close + volume from daily_prices."""
     placeholders = ",".join(["%s"] * len(symbols))
@@ -319,6 +336,7 @@ def _compute_all(
     params = TIMEFRAME_PARAMS[timeframe]
     symbols = list(ticker_map.keys())
     data_map = _fetch_for_timeframe(conn, symbols, timeframe)
+    meta_map = _fetch_ticker_metadata(conn, symbols)
 
     results: list[dict] = []
 
@@ -354,6 +372,7 @@ def _compute_all(
             for idx, v in spread.dropna().tail(params["spread_bars"]).items()
         ]
 
+        meta = meta_map.get(sym, {})
         results.append({
             "asset": name,
             "symbol": sym,
@@ -366,6 +385,8 @@ def _compute_all(
             "return_3m": _trailing_return(close, params["ret_3m"]),
             "return_6m": _trailing_return(close, params["ret_6m"]),
             "return_ytd": _trailing_return(close, "YTD"),
+            "market_cap": meta.get("market_cap"),
+            "style_bucket": meta.get("style_bucket"),
             "spread_series": spread_series,
         })
 
