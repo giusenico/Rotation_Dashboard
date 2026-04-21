@@ -66,6 +66,8 @@ SECTOR_ETFS = {
 # Cross-asset ETFs — broad asset-class exposure
 # ---------------------------------------------------------------------------
 CROSS_ASSET_ETFS = {
+    "SPY": "S&P 500",
+    "BTC-USD": "Bitcoin",
     "BND": "US Aggregate Bond Market",
     "SHY": "1-3 Year US Treasury Bonds",
     "SHV": "Short Treasury Bonds (0-1 Year)",
