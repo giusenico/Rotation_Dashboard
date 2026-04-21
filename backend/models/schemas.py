@@ -153,6 +153,29 @@ class OBVDetailResponse(BaseModel):
     score_history: list[OBVDetailScorePoint]
 
 
+# ── Crypto Top 20 (global mcap, CoinGecko) ──────────────────────────
+
+class CryptoTop20Entry(BaseModel):
+    id: str
+    symbol: str
+    name: str
+    style_bucket: str | None = None
+    logo_url: str | None = None
+    snapshot_date: str | None = None
+    rank: int
+    market_cap: int | None = None
+    price: float | None = None
+    change_24h: float | None = None
+    change_7d: float | None = None
+    volume_24h: int | None = None
+
+
+class CryptoHistoryPoint(BaseModel):
+    date: str | None = None
+    market_cap: int | None = None
+    price: float | None = None
+
+
 # ── Dashboard ────────────────────────────────────────────────────────
 
 class DashboardSummary(BaseModel):
