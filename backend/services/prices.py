@@ -57,6 +57,34 @@ def get_price_series(
         return []
 
 
+def _get_adj_close_only(
+    conn,
+    symbol: str,
+    start_date: str | None = None,
+    end_date: str | None = None,
+) -> list[dict]:
+    """Fetch only date + adj_close. Used by performance/drawdown/correlation to
+    avoid egressing unused OHLCV columns (~70% less DB→backend traffic)."""
+    if not symbol:
+        return []
+    query = "SELECT date, adj_close FROM daily_prices WHERE symbol = %s"
+    params: list = [symbol]
+    if start_date:
+        query += " AND date >= %s"
+        params.append(start_date)
+    if end_date:
+        query += " AND date <= %s"
+        params.append(end_date)
+    query += " ORDER BY date"
+    try:
+        with conn.cursor() as cur:
+            cur.execute(query, params)
+            return [{"date": row[0], "adj_close": row[1]} for row in cur.fetchall()]
+    except Exception:
+        logger.exception("Failed to fetch adj_close series for symbol=%s", symbol)
+        return []
+
+
 def get_multi_price_series(
     conn,
     symbols: list[str],
@@ -104,9 +132,8 @@ def compute_performance(conn, symbols: list[str]) -> list[dict]:
     results = []
     for sym in symbols:
         try:
-            # Fetch all prices for this ticker (last 1 year + buffer)
             start = (today - timedelta(days=400)).isoformat()
-            prices = get_price_series(conn, sym, start_date=start)
+            prices = _get_adj_close_only(conn, sym, start_date=start)
             if not prices:
                 results.append(_empty_performance_entry(sym))
                 continue
@@ -156,7 +183,7 @@ def compute_drawdown(
     """Compute drawdown-from-peak series."""
     if not symbol:
         return []
-    prices = get_price_series(conn, symbol, start_date, end_date)
+    prices = _get_adj_close_only(conn, symbol, start_date, end_date)
     if not prices:
         return []
 
@@ -184,11 +211,10 @@ def compute_correlation(
     today = date.today()
     start = (today - timedelta(days=int(lookback_days * 1.5))).isoformat()
 
-    # Fetch adj_close for all symbols
     all_data = {}
     for sym in symbols:
         try:
-            prices = get_price_series(conn, sym, start_date=start)
+            prices = _get_adj_close_only(conn, sym, start_date=start)
             if prices:
                 df = pd.DataFrame(prices)[["date", "adj_close"]]
                 df["date"] = pd.to_datetime(df["date"])
