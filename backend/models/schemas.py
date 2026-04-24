@@ -46,6 +46,12 @@ class RankingEntry(BaseModel):
     momentum: float
     score: float
     quadrant: str
+    # Optional crypto-universe extras (populated only for /rankings/crypto):
+    display_symbol: str | None = None   # "BTC" — for crypto rows; tickers use `ticker`
+    logo_url: str | None = None
+    style_bucket: str | None = None
+    market_cap: int | None = None
+    asset_type: str = "ticker"           # "ticker" | "crypto" — frontend discriminator
 
 
 # ── Prices ───────────────────────────────────────────────────────────
@@ -101,6 +107,18 @@ class OBVSpreadPoint(BaseModel):
     value: float
 
 
+class OBVScorePoint(BaseModel):
+    date: str
+    rotation_score: float | None = None
+    obv_regime: str
+
+
+class OBVScoreHistoryEntry(BaseModel):
+    symbol: str
+    asset: str
+    data: list[OBVScorePoint]
+
+
 class OBVStructureEntry(BaseModel):
     asset: str
     symbol: str
@@ -115,18 +133,13 @@ class OBVStructureEntry(BaseModel):
     market_cap: int | None = None
     style_bucket: str | None = None
     spread_series: list[OBVSpreadPoint]
-
-
-class OBVScorePoint(BaseModel):
-    date: str
-    rotation_score: float | None = None
-    obv_regime: str
-
-
-class OBVScoreHistoryEntry(BaseModel):
-    symbol: str
-    asset: str
-    data: list[OBVScorePoint]
+    # Optional crypto-universe extras:
+    display_symbol: str | None = None   # "BTC" for crypto rows; None for tickers
+    logo_url: str | None = None
+    asset_type: str = "ticker"           # "ticker" | "crypto"
+    # Optional inline score history (crypto path only — tickers use the
+    # separate /flow/score-history endpoint backed by obv_daily_metrics).
+    score_history: list[OBVScorePoint] | None = None
 
 
 class OBVDetailScorePoint(BaseModel):
@@ -151,6 +164,10 @@ class OBVDetailResponse(BaseModel):
     obv_series: list[OBVSpreadPoint]
     spread_series: list[OBVSpreadPoint]
     score_history: list[OBVDetailScorePoint]
+    # Optional crypto-universe extras:
+    display_symbol: str | None = None
+    logo_url: str | None = None
+    asset_type: str = "ticker"
 
 
 # ── Crypto Top 20 (global mcap, CoinGecko) ──────────────────────────
@@ -201,6 +218,11 @@ class RegimeSummaryEntry(BaseModel):
     capital_flow_z: float | None = None
     flow_label: str
     sma_value: float | None = None
+    # Optional crypto-universe extras:
+    display_symbol: str | None = None
+    logo_url: str | None = None
+    asset_type: str = "ticker"
+    style_bucket: str | None = None     # PSM sleeve (crypto only)
 
 
 class RegimeTimePoint(BaseModel):
@@ -227,6 +249,10 @@ class RegimeDetailResponse(BaseModel):
     regime_series: list[RegimeTimePoint]
     overext_series: list[RegimeTimePoint]
     flow_series: list[RegimeTimePoint]
+    # Optional crypto-universe extras:
+    display_symbol: str | None = None
+    logo_url: str | None = None
+    asset_type: str = "ticker"
 
 
 # ── Volatility ──────────────────────────────────────────────────────

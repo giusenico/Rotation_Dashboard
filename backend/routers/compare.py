@@ -11,11 +11,12 @@ router = APIRouter()
 
 @router.get("")
 def compare(
-    symbols: str = Query(..., description="Comma-separated symbols (2-5)"),
-    lookback: int = Query(252, ge=63, le=2520),
+    symbols: str = Query(..., description="Comma-separated symbols (2-5). Accepts tickers (uppercase) and crypto asset_ids (lowercase CoinGecko id)."),
+    lookback: int = Query(252, ge=21, le=2520),
     conn=Depends(get_db),
 ):
-    symbol_list = parse_symbol_list(symbols)
+    # Preserve case: tickers are uppercase, crypto asset_ids (e.g. "bitcoin") are lowercase.
+    symbol_list = parse_symbol_list(symbols, uppercase=False)
 
     if len(symbol_list) < 2:
         raise HTTPException(status_code=400, detail="At least 2 symbols required")

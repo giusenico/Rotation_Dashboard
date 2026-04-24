@@ -65,34 +65,104 @@ def _cache_set(key: str, data) -> None:
 
 # ── Data fetching ────────────────────────────────────────────────────
 
-def _fetch_ohlcv(conn, symbols: list[str], lookback: int) -> pd.DataFrame:
-    """Fetch daily OHLCV for given symbols, last `lookback` trading days."""
-    placeholders = ",".join(["%s"] * len(symbols))
-    query = f"""
-        SELECT symbol, date, open, high, low, close, adj_close, volume
-        FROM daily_prices
-        WHERE symbol IN ({placeholders})
-        ORDER BY date
+def _classify_symbols(conn, symbols: list[str]) -> tuple[dict[str, str], dict[str, dict]]:
     """
-    with conn.cursor() as cur:
-        cur.execute(query, symbols)
-        rows = cur.fetchall()
+    Classify each symbol as "ticker" or "crypto" by presence in crypto_assets.
+    Returns (classification, crypto_meta).
 
-    if not rows:
+      classification[sym] -> "crypto" if sym is a CoinGecko asset_id, else "ticker"
+      crypto_meta[asset_id] -> {display_symbol, name, logo_url}
+    """
+    if not symbols:
+        return {}, {}
+    placeholders = ",".join(["%s"] * len(symbols))
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                f"SELECT id, symbol, name, logo_url FROM crypto_assets WHERE id IN ({placeholders})",
+                symbols,
+            )
+            rows = cur.fetchall()
+    except Exception:
+        logger.exception("Failed to classify symbols %s", symbols)
+        rows = []
+    crypto_meta = {
+        aid: {"display_symbol": sym, "name": name, "logo_url": logo}
+        for aid, sym, name, logo in rows
+    }
+    classification = {s: "crypto" if s in crypto_meta else "ticker" for s in symbols}
+    return classification, crypto_meta
+
+
+def _fetch_ohlcv(conn, symbols: list[str], lookback: int) -> pd.DataFrame:
+    """
+    Fetch daily OHLCV for a mixed list of tickers and crypto asset_ids.
+
+    Tickers come from `daily_prices`; crypto come from `crypto_mcap_snapshots`
+    (OHLC filled with price since daily crypto snapshots only store close).
+    Output has the same column schema the compute layer already relies on.
+    """
+    classification, _ = _classify_symbols(conn, symbols)
+    ticker_syms = [s for s, k in classification.items() if k == "ticker"]
+    crypto_syms = [s for s, k in classification.items() if k == "crypto"]
+
+    frames: list[pd.DataFrame] = []
+
+    if ticker_syms:
+        placeholders = ",".join(["%s"] * len(ticker_syms))
+        query = f"""
+            SELECT symbol, date, open, high, low, close, adj_close, volume
+            FROM daily_prices
+            WHERE symbol IN ({placeholders})
+            ORDER BY date
+        """
+        with conn.cursor() as cur:
+            cur.execute(query, ticker_syms)
+            rows = cur.fetchall()
+        if rows:
+            df = pd.DataFrame(
+                rows,
+                columns=["symbol", "date", "open", "high", "low", "close", "adj_close", "volume"],
+            )
+            df["date"] = pd.to_datetime(df["date"])
+            frames.append(df)
+
+    if crypto_syms:
+        placeholders = ",".join(["%s"] * len(crypto_syms))
+        query = f"""
+            SELECT asset_id, snapshot_date, price, volume_24h
+            FROM crypto_mcap_snapshots
+            WHERE asset_id IN ({placeholders})
+            ORDER BY snapshot_date
+        """
+        with conn.cursor() as cur:
+            cur.execute(query, crypto_syms)
+            rows = cur.fetchall()
+        if rows:
+            df = pd.DataFrame(rows, columns=["symbol", "date", "close", "volume"])
+            df["date"] = pd.to_datetime(df["date"])
+            df["close"] = df["close"].astype(float)
+            df["adj_close"] = df["close"]
+            df["open"] = df["close"]
+            df["high"] = df["close"]
+            df["low"] = df["close"]
+            df["volume"] = df["volume"].fillna(0).astype(float)
+            frames.append(df[["symbol", "date", "open", "high", "low", "close", "adj_close", "volume"]])
+
+    if not frames:
         return pd.DataFrame()
 
-    df = pd.DataFrame(rows, columns=["symbol", "date", "open", "high", "low", "close", "adj_close", "volume"])
-    df["date"] = pd.to_datetime(df["date"])
+    combined = pd.concat(frames, ignore_index=True)
 
     # Keep last N + buffer trading days so that return calculations
     # (which need lookback+1 points) always have enough data.
     fetch_size = lookback + 30
-    all_dates = sorted(df["date"].unique())
+    all_dates = sorted(combined["date"].unique())
     if len(all_dates) > fetch_size:
         cutoff = all_dates[-fetch_size]
-        df = df[df["date"] >= cutoff]
+        combined = combined[combined["date"] >= cutoff]
 
-    return df
+    return combined
 
 
 def _fetch_obv_latest(conn, symbols: list[str]) -> dict:
@@ -271,31 +341,60 @@ def _compute_performance(df: pd.DataFrame) -> dict:
 
 
 def _compute_rrg_positions(
-    conn, symbols: list[str], benchmark_symbol: str = "^GSPC",
+    conn, symbols: list[str],
     rs_span: int = 20, momentum_span: int = 10, trail_length: int = 5,
 ) -> dict:
-    """Compute RRG RS-Ratio & RS-Momentum for given symbols vs benchmark.
+    """Compute RRG RS-Ratio & RS-Momentum for given symbols vs an adaptive benchmark.
 
-    Returns {symbol: {ratio, momentum, quadrant, trail: [{date, ratio, momentum}, ...]}}.
+    Benchmark rule:
+      - All tickers       → ^GSPC from daily_prices
+      - All crypto        → bitcoin from crypto_mcap_snapshots
+      - Mixed             → skip (returns {}) — no meaningful cross-universe benchmark
+
+    Returns {symbol: {ratio, momentum, quadrant, trail: […]}}.
     """
     from backend.services.rrg import assign_quadrant
 
-    all_syms = list(set(symbols + [benchmark_symbol]))
-    placeholders = ",".join(["%s"] * len(all_syms))
-    query = f"""
-        SELECT symbol, date, adj_close
-        FROM daily_prices
-        WHERE symbol IN ({placeholders})
-        ORDER BY date
-    """
-    with conn.cursor() as cur:
-        cur.execute(query, all_syms)
-        rows = cur.fetchall()
+    classification, _ = _classify_symbols(conn, symbols)
+    ticker_syms = [s for s, k in classification.items() if k == "ticker"]
+    crypto_syms = [s for s, k in classification.items() if k == "crypto"]
 
-    if not rows:
-        return {}
+    if ticker_syms and crypto_syms:
+        return {}  # cross-universe RRG is not defined
 
-    df = pd.DataFrame(rows, columns=["symbol", "date", "adj_close"])
+    if ticker_syms and not crypto_syms:
+        benchmark_symbol = "^GSPC"
+        all_syms = list(set(ticker_syms + [benchmark_symbol]))
+        placeholders = ",".join(["%s"] * len(all_syms))
+        query = f"""
+            SELECT symbol, date, adj_close
+            FROM daily_prices
+            WHERE symbol IN ({placeholders})
+            ORDER BY date
+        """
+        with conn.cursor() as cur:
+            cur.execute(query, all_syms)
+            rows = cur.fetchall()
+        if not rows:
+            return {}
+        df = pd.DataFrame(rows, columns=["symbol", "date", "adj_close"])
+    else:  # crypto only
+        benchmark_symbol = "bitcoin"
+        all_syms = list(set(crypto_syms + [benchmark_symbol]))
+        placeholders = ",".join(["%s"] * len(all_syms))
+        query = f"""
+            SELECT asset_id, snapshot_date, price
+            FROM crypto_mcap_snapshots
+            WHERE asset_id IN ({placeholders})
+            ORDER BY snapshot_date
+        """
+        with conn.cursor() as cur:
+            cur.execute(query, all_syms)
+            rows = cur.fetchall()
+        if not rows:
+            return {}
+        df = pd.DataFrame(rows, columns=["symbol", "date", "adj_close"])
+
     df["date"] = pd.to_datetime(df["date"])
     pivot = df.pivot(index="date", columns="symbol", values="adj_close").sort_index()
     pivot = pivot.ffill()
@@ -307,13 +406,13 @@ def _compute_rrg_positions(
         return {}
 
     benchmark = pivot[benchmark_symbol]
-    available = [s for s in symbols if s in pivot.columns]
+    target_syms = ticker_syms or crypto_syms
+    available = [s for s in target_syms if s in pivot.columns]
     if not available:
         return {}
 
     sectors = pivot[available]
 
-    # RS computation (same as rrg.py)
     rs = sectors.div(benchmark / 100, axis=0).ewm(span=rs_span, adjust=False).mean()
     rel_ratio = 100 + (rs - rs.mean()) / rs.std()
 
@@ -416,20 +515,37 @@ def get_comparison(conn, symbols: list[str], lookback: int = DEFAULT_LOOKBACK) -
         if df.empty:
             return {"symbols": symbols, "error": "No data found"}
 
-        obv_data = _fetch_obv_latest(conn, symbols)
+        classification, crypto_meta = _classify_symbols(conn, symbols)
+        ticker_syms = [s for s, k in classification.items() if k == "ticker"]
+
+        # OBV data only exists for tickers (obv_daily_metrics is ticker-only).
+        obv_data = _fetch_obv_latest(conn, ticker_syms) if ticker_syms else {}
 
         # Build asset info
         assets = []
         performance = _compute_performance(df)
         regime = _compute_regime_simple(df)
         for sym in symbols:
-            name = ALL_TICKERS.get(sym, sym)
+            is_crypto = classification.get(sym) == "crypto"
+            if is_crypto:
+                cmeta = crypto_meta.get(sym, {})
+                name = cmeta.get("name") or sym
+                display_symbol = cmeta.get("display_symbol")
+                logo_url = cmeta.get("logo_url")
+            else:
+                name = ALL_TICKERS.get(sym, sym)
+                display_symbol = None
+                logo_url = None
+
             perf = performance.get(sym, {})
             reg = regime.get(sym, {})
             obv = obv_data.get(sym, {})
             assets.append({
                 "symbol": sym,
                 "name": name,
+                "asset_type": "crypto" if is_crypto else "ticker",
+                "display_symbol": display_symbol,
+                "logo_url": logo_url,
                 "last_price": perf.get("last_price"),
                 "return_1w": perf.get("return_1w"),
                 "return_1m": perf.get("return_1m"),

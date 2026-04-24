@@ -10,6 +10,7 @@ from backend.models.schemas import (
     OBVStructureEntry,
 )
 from backend.services.flow import get_obv_detail, get_obv_score_history, get_obv_structure
+from backend.services.crypto_flow import get_crypto_obv_detail, get_crypto_obv_structure
 
 router = APIRouter()
 
@@ -45,4 +46,30 @@ def obv_detail(
     result = get_obv_detail(conn, symbol=symbol, lookback_bars=lookback, timeframe=timeframe)
     if result is None:
         raise HTTPException(status_code=404, detail=f"Symbol '{symbol}' not found in OBV universe")
+    return result
+
+
+# ── Crypto universe (daily/weekly only) ──────────────────────────────
+
+@router.get("/crypto/structure", response_model=list[OBVStructureEntry])
+def crypto_obv_structure(
+    timeframe: str = Query("daily", pattern="^(daily|weekly)$"),
+    universe_limit: int = Query(20, ge=5, le=50),
+    conn=Depends(get_db),
+):
+    return get_crypto_obv_structure(conn, timeframe=timeframe, universe_limit=universe_limit)
+
+
+@router.get("/crypto/detail/{asset_id}", response_model=OBVDetailResponse)
+def crypto_obv_detail(
+    asset_id: str,
+    lookback: int = Query(252, ge=21, le=9999),
+    timeframe: str = Query("daily", pattern="^(daily|weekly)$"),
+    conn=Depends(get_db),
+):
+    if not asset_id:
+        raise HTTPException(status_code=400, detail="asset_id is required")
+    result = get_crypto_obv_detail(conn, asset_id=asset_id, lookback_bars=lookback, timeframe=timeframe)
+    if result is None:
+        raise HTTPException(status_code=404, detail=f"Crypto asset '{asset_id}' not found")
     return result

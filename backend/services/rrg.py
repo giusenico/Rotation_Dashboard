@@ -54,11 +54,6 @@ def _cache_set(key: str, data: dict) -> None:
     _cache[key] = _CacheEntry(data=data)
 
 
-def invalidate_cache() -> None:
-    """Clear all RRG in-memory caches."""
-    _cache.clear()
-
-
 # ── Helpers ──────────────────────────────────────────────────────────
 
 def _fetch_adj_close(conn, symbols: list[str]) -> pd.DataFrame:
@@ -257,7 +252,8 @@ def get_sector_rrg(conn, trail_length: int = 5, rs_span: int = 20, momentum_span
     if cached is not None:
         return cached
     result = compute_rrg(conn, SECTOR_ETFS, trail_length=trail_length, rs_span=rs_span, momentum_span=momentum_span, timeframe=timeframe)
-    _cache_set(cache_key, result)
+    if result["data"]:
+        _cache_set(cache_key, result)
     return result
 
 
@@ -267,7 +263,8 @@ def get_cross_asset_rrg(conn, trail_length: int = 5, rs_span: int = 20, momentum
     if cached is not None:
         return cached
     result = compute_rrg(conn, CROSS_ASSET_ETFS, trail_length=trail_length, rs_span=rs_span, momentum_span=momentum_span, timeframe=timeframe)
-    _cache_set(cache_key, result)
+    if result["data"]:
+        _cache_set(cache_key, result)
     return result
 
 
@@ -277,7 +274,8 @@ def get_sector_rankings(conn, timeframe: str = "weekly") -> list[dict]:
     if cached is not None:
         return cached
     result = compute_rankings(conn, SECTOR_ETFS, timeframe=timeframe)
-    _cache_set(cache_key, result)
+    if result:
+        _cache_set(cache_key, result)
     return result
 
 
@@ -287,5 +285,6 @@ def get_cross_asset_rankings(conn, timeframe: str = "weekly") -> list[dict]:
     if cached is not None:
         return cached
     result = compute_rankings(conn, CROSS_ASSET_ETFS, timeframe=timeframe)
-    _cache_set(cache_key, result)
+    if result:
+        _cache_set(cache_key, result)
     return result
