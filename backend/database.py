@@ -6,6 +6,7 @@ and closed on shutdown.  The ``get_db`` dependency yields a connection
 from the pool for each request.
 """
 
+import os
 from contextlib import contextmanager
 
 import psycopg2
@@ -20,10 +21,21 @@ logger = logging.getLogger(__name__)
 
 _pool: pool.ThreadedConnectionPool | None = None
 
+# Defaults sized for a single Render instance against Supabase direct
+# connections. Override via DB_POOL_MIN / DB_POOL_MAX without redeploy.
+_DEFAULT_MIN = 2
+_DEFAULT_MAX = 30
 
-def create_pool(minconn: int = 2, maxconn: int = 10) -> pool.ThreadedConnectionPool:
+
+def create_pool(
+    minconn: int | None = None,
+    maxconn: int | None = None,
+) -> pool.ThreadedConnectionPool:
     global _pool
+    minconn = minconn if minconn is not None else int(os.getenv("DB_POOL_MIN", _DEFAULT_MIN))
+    maxconn = maxconn if maxconn is not None else int(os.getenv("DB_POOL_MAX", _DEFAULT_MAX))
     _pool = pool.ThreadedConnectionPool(minconn, maxconn, dsn=SUPABASE_DB_URL)
+    logger.info("DB pool created (min=%s, max=%s)", minconn, maxconn)
     return _pool
 
 
