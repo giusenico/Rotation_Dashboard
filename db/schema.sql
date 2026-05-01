@@ -273,9 +273,12 @@ CREATE TABLE IF NOT EXISTS psm_policy_matrix (
 -- `tickers` — CoinGecko-sourced, daily snapshots for historical trend)
 -- ============================================================
 
+-- Static metadata for each crypto asset that has ever appeared in top-N.
+-- Style bucket is assigned manually (NULL = new entrant awaiting review;
+-- the card filters NULL out).
 CREATE TABLE IF NOT EXISTS crypto_assets (
     id           TEXT    PRIMARY KEY,      -- CoinGecko id (e.g. 'bitcoin')
-    symbol       TEXT    NOT NULL,
+    symbol       TEXT    NOT NULL,         -- ticker (e.g. 'BTC')
     name         TEXT    NOT NULL,
     style_bucket TEXT    CHECK (style_bucket IS NULL OR style_bucket IN ('growth', 'safety', 'tactical')),
     logo_url     TEXT,
@@ -283,19 +286,49 @@ CREATE TABLE IF NOT EXISTS crypto_assets (
 );
 CREATE INDEX IF NOT EXISTS idx_crypto_assets_style_bucket ON crypto_assets (style_bucket) WHERE style_bucket IS NOT NULL;
 
+-- Daily snapshots (one row per asset per day). Stablecoins and wrapped /
+-- staked derivatives are excluded at fetch time to preserve signal quality
+-- — they live in crypto_assets never here.
 CREATE TABLE IF NOT EXISTS crypto_mcap_snapshots (
     snapshot_date   DATE    NOT NULL,
     asset_id        TEXT    NOT NULL REFERENCES crypto_assets (id),
-    rank            INT     NOT NULL,
-    market_cap      BIGINT  NOT NULL,
+    rank            INT     NOT NULL,                 -- position in the filtered top-N on that day
+    market_cap      BIGINT,                            -- NULL on yfinance-backfilled history rows (pre-CoinGecko coverage)
     price           DOUBLE PRECISION,
-    change_24h      DOUBLE PRECISION,
-    change_7d       DOUBLE PRECISION,
+    change_24h      DOUBLE PRECISION,                 -- % change over trailing 24h
+    change_7d       DOUBLE PRECISION,                 -- % change over trailing 7d
     volume_24h      BIGINT,
     PRIMARY KEY (snapshot_date, asset_id)
 );
 CREATE INDEX IF NOT EXISTS idx_crypto_snapshots_date_rank ON crypto_mcap_snapshots (snapshot_date, rank);
 
+-- OBV structure metrics for the crypto universe — mirrors obv_daily_metrics
+-- on the ticker side. Pre-computed by scripts/update_crypto_flow.py so the
+-- /api/obv/crypto/structure endpoint becomes a pure SELECT (no cold-start
+-- compute). Trailing returns live alongside the OBV scalars to keep one
+-- row per (date, asset) self-contained.
+CREATE TABLE IF NOT EXISTS crypto_obv_metrics (
+    date            DATE    NOT NULL,
+    asset_id        TEXT    NOT NULL REFERENCES crypto_assets (id),
+    obv_regime      TEXT    NOT NULL,            -- 'buy' | 'sell'
+    spread_last     REAL,                         -- raw spread (OBV - SMA)
+    spread_pct      REAL,                         -- percentile rank [-1, +1]
+    momentum_z      REAL,                         -- tanh z-score momentum
+    rotation_score  REAL,                         -- composite [-1, +1]
+    return_1m       REAL,
+    return_3m       REAL,
+    return_6m       REAL,
+    return_ytd      REAL,
+    PRIMARY KEY (date, asset_id)
+);
+CREATE INDEX IF NOT EXISTS idx_crypto_obv_metrics_asset_date
+    ON crypto_obv_metrics (asset_id, date DESC);
+
+-- Seed initial classification. Idempotent via ON CONFLICT.
+-- Buckets:
+--   safety   — store-of-value, digital gold narrative
+--   growth   — smart-contract L1/L2 platforms, infrastructure
+--   tactical — exchange tokens, alt payments, DeFi, memes
 INSERT INTO crypto_assets (id, symbol, name, style_bucket) VALUES
     ('bitcoin',        'BTC',   'Bitcoin',     'safety'),
     ('ethereum',       'ETH',   'Ethereum',    'growth'),

@@ -21,10 +21,11 @@ logger = logging.getLogger(__name__)
 
 _pool: pool.ThreadedConnectionPool | None = None
 
-# Defaults sized for a single Render instance against Supabase direct
-# connections. Override via DB_POOL_MIN / DB_POOL_MAX without redeploy.
+# Defaults sized to stay under Supabase's session-pooler client cap (15 by
+# default on port 5432). With transaction pooler (port 6543) you can safely
+# raise DB_POOL_MAX via env without redeploy.
 _DEFAULT_MIN = 2
-_DEFAULT_MAX = 30
+_DEFAULT_MAX = 10
 
 
 def create_pool(

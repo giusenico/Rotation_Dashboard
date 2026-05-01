@@ -130,9 +130,18 @@ class OBVStructureEntry(BaseModel):
     return_3m: float | None = None
     return_6m: float | None = None
     return_ytd: float | None = None
+    # Trigger levels derived from recent swing high / low of the close
+    # series (≈1m window, padded ±0.5% when the latest bar prints the
+    # extreme so the level stays actionable).
+    last_price: float | None = None
+    confirmation_price: float | None = None
+    invalidation_price: float | None = None
     market_cap: int | None = None
     style_bucket: str | None = None
     spread_series: list[OBVSpreadPoint]
+    # Bars (≈days at daily timeframe) the asset has stayed in its current
+    # OBV regime — drives the "freshness" sort for the framework table.
+    days_in_regime: int | None = None
     # Optional crypto-universe extras:
     display_symbol: str | None = None   # "BTC" for crypto rows; None for tickers
     logo_url: str | None = None

@@ -238,6 +238,26 @@ def _regime(spread_last: float) -> str:
     return "buy" if spread_last >= 0 else "sell"
 
 
+def _days_in_regime(spread: pd.Series) -> int | None:
+    """Bars since the spread last flipped sign — the live regime's run length.
+
+    Walks backwards from the latest bar; the count includes the latest bar
+    itself, so a fresh same-day flip prints 1.
+    """
+    s = spread.dropna()
+    if s.empty:
+        return None
+    last = float(s.iloc[-1])
+    current_pos = last >= 0
+    run = 0
+    for v in reversed(s.values):
+        is_pos = float(v) >= 0
+        if is_pos != current_pos:
+            break
+        run += 1
+    return run
+
+
 def _compute_rolling_scores(
     spread: pd.Series,
     rank_lookback: int,
@@ -372,6 +392,30 @@ def _compute_all(
             for idx, v in spread.dropna().tail(params["spread_bars"]).items()
         ]
 
+        # Confirmation / invalidation triggers — recent swing levels off
+        # the close series. The window length scales with the timeframe so
+        # the levels stay in roughly the same horizon (1m of bars):
+        #   daily   → 20 bars  (~1 month)
+        #   4h      → 40 bars
+        #   weekly  → 4 bars
+        # confirmation = recent high (break-above adds conviction)
+        # invalidation = recent low  (break-below kills the read)
+        trig_window = params.get("ret_1m", 20)
+        last_close: float | None = None
+        confirmation_price: float | None = None
+        invalidation_price: float | None = None
+        if len(close.dropna()) >= 2:
+            last_close = float(close.dropna().iloc[-1])
+            window = close.dropna().tail(trig_window)
+            if len(window) >= 2:
+                hi = float(window.max())
+                lo = float(window.min())
+                # If the last close itself prints the high/low, the
+                # trigger collapses onto the current price and stops being
+                # actionable — pad ±0.5% so the levels stay distinct.
+                confirmation_price = hi if hi > last_close * 1.001 else round(last_close * 1.005, 4)
+                invalidation_price = lo if lo < last_close * 0.999 else round(last_close * 0.995, 4)
+
         meta = meta_map.get(sym, {})
         results.append({
             "asset": name,
@@ -385,9 +429,13 @@ def _compute_all(
             "return_3m": _trailing_return(close, params["ret_3m"]),
             "return_6m": _trailing_return(close, params["ret_6m"]),
             "return_ytd": _trailing_return(close, "YTD"),
+            "last_price": round(last_close, 4) if last_close is not None else None,
+            "confirmation_price": round(confirmation_price, 4) if confirmation_price is not None else None,
+            "invalidation_price": round(invalidation_price, 4) if invalidation_price is not None else None,
             "market_cap": meta.get("market_cap"),
             "style_bucket": meta.get("style_bucket"),
             "spread_series": spread_series,
+            "days_in_regime": _days_in_regime(spread),
         })
 
     results.sort(
